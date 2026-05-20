@@ -1,0 +1,69 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+  campaigns Campaign[]
+}
+
+model Campaign {
+  id          Int      @id @default(autoincrement())
+  name        String
+  client      String?
+  budgetTarget Float?
+  period      String?
+  target      String?
+  objectives  String?
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  media       CampaignMedium[]
+  scenarios   Scenario[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MediumCatalog {
+  id         Int    @id @default(autoincrement())
+  name       String @unique
+  defaultCPR Float
+  defaultAM  Float
+  defaultV   Float
+  campaignMedia CampaignMedium[]   // ← RELACIÓN INVERSA
+}
+
+model CampaignMedium {
+  id              Int      @id @default(autoincrement())
+  campaignId      Int
+  campaign        Campaign @relation(fields: [campaignId], references: [id])
+  mediumCatalogId Int
+  mediumCatalog   MediumCatalog @relation(fields: [mediumCatalogId], references: [id])
+  customName      String?
+  cpr             Float
+  am              Float
+  v               Float
+  investment      Float    @default(0)
+  orderIndex      Int      @default(0)
+}
+
+model Scenario {
+  id         Int      @id @default(autoincrement())
+  name       String
+  campaignId Int
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  snapshot   Json     // guarda el array de medios con sus valores
+  createdAt  DateTime @default(now())
+}
