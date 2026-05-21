@@ -1,1020 +1,250 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Budget Allocator — Planeador de Inversión Publicitaria</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: Arial, sans-serif; font-size: 13px; color: #1a1a1a; background: #f0f0f0; }
-
-/* ── LAYOUT ── */
-.app { display: flex; flex-direction: column; min-height: 100vh; }
-.topbar { background: #1a2a3a; color: #fff; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
-.topbar h1 { font-size: 15px; font-weight: bold; letter-spacing: .3px; }
-.topbar .campaign-name { font-size: 12px; color: #aac; margin-left: 14px; }
-.topbar-right { display: flex; gap: 8px; align-items: center; }
-
-/* ── TABS ── */
-.tabs { background: #223; display: flex; gap: 0; border-bottom: 2px solid #1a2a3a; }
-.tab { padding: 9px 18px; font-size: 12px; color: #99a; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; user-select: none; }
-.tab:hover { color: #cce; }
-.tab.active { color: #fff; border-bottom-color: #4af; background: #1a2a3a; }
-.tab-content { display: none; padding: 18px 20px; }
-.tab-content.active { display: block; }
-
-/* ── BUTTONS ── */
-.btn { font-size: 11px; padding: 5px 12px; border: none; border-radius: 3px; cursor: pointer; font-family: Arial, sans-serif; }
-.btn-primary { background: #1a6eb5; color: #fff; }
-.btn-primary:hover { background: #155a99; }
-.btn-danger { background: #c0392b; color: #fff; }
-.btn-danger:hover { background: #a93226; }
-.btn-success { background: #1e8449; color: #fff; }
-.btn-success:hover { background: #196a3b; }
-.btn-outline { background: #fff; color: #333; border: 1px solid #ccc; }
-.btn-outline:hover { background: #f4f4f4; }
-.btn-dark { background: #1a2a3a; color: #fff; }
-.btn-dark:hover { background: #111d28; }
-
-/* ── KPI CARDS ── */
-.kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 16px; }
-.kpi { background: #fff; border: 1px solid #ddd; padding: 11px 13px; }
-.kpi-label { font-size: 10px; text-transform: uppercase; color: #888; letter-spacing: .4px; margin-bottom: 4px; }
-.kpi-value { font-size: 20px; font-weight: bold; font-family: monospace; color: #111; }
-.kpi-sub { font-size: 10px; color: #aaa; margin-top: 2px; }
-.kpi.highlight { border-left: 3px solid #1a6eb5; }
-
-/* ── TABLES ── */
-.table-wrap { background: #fff; border: 1px solid #ddd; margin-bottom: 16px; overflow-x: auto; }
-.table-header { font-size: 11px; font-weight: bold; text-transform: uppercase; color: #555; letter-spacing: .4px; padding: 9px 12px 7px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
-table { border-collapse: collapse; width: 100%; }
-th { background: #f5f5f5; font-size: 10px; font-weight: bold; text-align: right; padding: 6px 9px; border-bottom: 2px solid #ddd; border-right: 1px solid #e8e8e8; color: #444; white-space: nowrap; }
-th:first-child { text-align: left; }
-th.eh { color: #1a6eb5; }
-td { padding: 4px 9px; border-bottom: 1px solid #eee; border-right: 1px solid #f0f0f0; text-align: right; white-space: nowrap; vertical-align: middle; }
-td:first-child { text-align: left; }
-td.calc { color: #555; font-family: monospace; font-size: 12px; }
-td.pos { color: #1e8449; font-family: monospace; font-size: 12px; }
-tr:hover td { background: #fafcff; }
-tfoot td { background: #efefef; font-weight: bold; border-top: 2px solid #ccc; font-family: monospace; font-size: 12px; }
-tfoot td:first-child { font-family: Arial, sans-serif; }
-.min-table { min-width: 1000px; }
-
-/* Inputs in table */
-input.ci {
-  width: 100%; border: none; text-align: right; font-size: 12px;
-  font-family: monospace; background: transparent; color: #1a6eb5;
-  padding: 2px 0; -moz-appearance: textfield;
-}
-input.ci::-webkit-outer-spin-button, input.ci::-webkit-inner-spin-button { -webkit-appearance: none; }
-input.ci:focus { outline: 2px solid #1a6eb5; background: #fff; border-radius: 2px; padding: 2px 4px; }
-input.ci-text { width: 100%; border: none; font-size: 12px; background: transparent; color: #1a6eb5; padding: 2px 0; }
-input.ci-text:focus { outline: 2px solid #1a6eb5; background: #fff; border-radius: 2px; padding: 2px 4px; }
-
-/* Progress bar */
-.bar-wrap { background: #eee; border-radius: 2px; height: 4px; width: 80px; display: inline-block; vertical-align: middle; }
-.bar-fill { height: 100%; border-radius: 2px; transition: width .3s; }
-
-/* Dot */
-.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: middle; flex-shrink: 0; }
-
-/* ── CHARTS ── */
-.charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
-.charts-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 16px; }
-.chart-box { background: #fff; border: 1px solid #ddd; padding: 13px 15px; }
-.chart-title { font-size: 11px; font-weight: bold; text-transform: uppercase; color: #555; letter-spacing: .4px; margin-bottom: 2px; }
-.chart-sub { font-size: 10px; color: #999; margin-bottom: 8px; }
-.chart-note { font-size: 10px; color: #bbb; margin-top: 5px; }
-.legend { display: flex; flex-wrap: wrap; gap: 5px 10px; margin-bottom: 7px; }
-.legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: #555; cursor: pointer; user-select: none; }
-.legend-line { width: 14px; height: 2px; border-radius: 1px; display: inline-block; }
-
-/* ── SCENARIOS ── */
-.scenario-list { display: flex; flex-direction: column; gap: 8px; }
-.scenario-card { background: #fff; border: 1px solid #ddd; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
-.scenario-card.active-sc { border-left: 3px solid #1a6eb5; }
-.scenario-meta { font-size: 11px; color: #888; margin-top: 2px; }
-.sc-actions { display: flex; gap: 6px; }
-.compare-box { background: #fff; border: 1px solid #ddd; padding: 13px 15px; margin-top: 14px; overflow-x: auto; }
-
-/* ── CAMPAIGN FORM ── */
-.form-row { display: flex; gap: 14px; margin-bottom: 12px; flex-wrap: wrap; }
-.form-group { display: flex; flex-direction: column; gap: 4px; }
-.form-group label { font-size: 11px; color: #666; font-weight: bold; }
-.form-group input, .form-group select, .form-group textarea {
-  border: 1px solid #ccc; border-radius: 3px; padding: 6px 9px; font-size: 12px;
-  font-family: Arial, sans-serif; color: #222;
-}
-.form-group input:focus, .form-group select:focus { outline: 2px solid #1a6eb5; border-color: #1a6eb5; }
-.form-group textarea { resize: vertical; min-height: 55px; }
-
-/* ── EXPORT ── */
-.export-section { background: #fff; border: 1px solid #ddd; padding: 16px; margin-bottom: 14px; }
-.export-title { font-size: 13px; font-weight: bold; margin-bottom: 10px; color: #333; }
-
-/* ── UTIL ── */
-.section-label { font-size: 11px; font-weight: bold; text-transform: uppercase; color: #777; letter-spacing: .4px; margin-bottom: 8px; margin-top: 16px; }
-.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.badge { font-size: 10px; padding: 2px 7px; border-radius: 10px; background: #e8f4ff; color: #1a6eb5; font-weight: bold; }
-.badge-green { background: #e8f5ec; color: #1e8449; }
-.badge-gray { background: #eee; color: #777; }
-.empty-state { text-align: center; padding: 30px; color: #aaa; font-size: 12px; }
-hr.sep { border: none; border-top: 1px solid #eee; margin: 14px 0; }
-
-/* ── PRINT ── */
-@media print {
-  .tabs, .topbar, .btn, .tab { display: none !important; }
-  .tab-content { display: block !important; padding: 0 !important; }
-  body { background: #fff; }
-  .chart-box, .table-wrap { break-inside: avoid; }
-}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Budget Allocator — Planeador de Inversión Publicitaria</title>
+  <!-- CSS modular -->
+  <link rel="stylesheet" href="/css/styles.css">
+  <!-- Chart.js desde CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 </head>
 <body>
 <div class="app">
 
-<!-- TOP BAR -->
-<div class="topbar">
-  <div style="display:flex;align-items:center;gap:6px">
-    <span>📊</span>
-    <h1>Budget Allocator</h1>
-    <span class="campaign-name" id="topbar-campaign">— Sin campaña activa</span>
-  </div>
-  <div class="topbar-right">
-    <span style="font-size:11px;color:#99a">Planeador de Inversión Publicitaria</span>
-  </div>
-</div>
-
-<!-- TABS -->
-<div class="tabs">
-  <div class="tab active" onclick="showTab('dashboard')">📊 Dashboard</div>
-  <div class="tab" onclick="showTab('campana')">🗂 Campaña</div>
-  <div class="tab" onclick="showTab('escenarios')">📁 Escenarios</div>
-  <div class="tab" onclick="showTab('exportar')">📤 Exportar</div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════════ -->
-<!-- TAB: DASHBOARD -->
-<!-- ═══════════════════════════════════════════════════════════════ -->
-<div class="tab-content active" id="tab-dashboard">
-
-  <!-- KPIs -->
-  <div class="kpis">
-    <div class="kpi highlight">
-      <div class="kpi-label">Inversión Total</div>
-      <div class="kpi-value" id="k-inv">$0</div>
-      <div class="kpi-sub">MXN</div>
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:6px">
+      <span>📊</span>
+      <h1>Budget Allocator</h1>
+      <span class="campaign-name" id="topbar-campaign">— Sin campaña activa</span>
     </div>
-    <div class="kpi">
-      <div class="kpi-label">TRP Total</div>
-      <div class="kpi-value" id="k-trp">0.0</div>
-      <div class="kpi-sub">puntos de rating</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Alcance Total</div>
-      <div class="kpi-value" id="k-alc">0.0%</div>
-      <div class="kpi-sub">de audiencia objetivo</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Frecuencia Prom.</div>
-      <div class="kpi-value" id="k-frec">—</div>
-      <div class="kpi-sub">impactos / persona</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Medios Activos</div>
-      <div class="kpi-value" id="k-activos">0</div>
-      <div class="kpi-sub">de <span id="k-total-medios">12</span> disponibles</div>
+    <div class="topbar-right">
+      <span style="font-size:11px;color:#99a">Planeador de Inversión Publicitaria</span>
     </div>
   </div>
 
-  <!-- TABLA PRINCIPAL -->
-  <div class="table-wrap">
-    <div class="table-header">
-      <span>Tabla de Inversión por Medio</span>
-      <div class="row">
-        <span style="font-size:10px;color:#999">✎ <span style="color:#1a6eb5">Azul</span> = editable &nbsp;|&nbsp; Gris = calculado</span>
-        <button class="btn btn-outline" onclick="addMedio()">+ Agregar medio</button>
+  <!-- TABS -->
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('dashboard')">📊 Dashboard</div>
+    <div class="tab" onclick="showTab('campana')">🗂 Campaña</div>
+    <div class="tab" onclick="showTab('escenarios')">📁 Escenarios</div>
+    <div class="tab" onclick="showTab('exportar')">📤 Exportar</div>
+  </div>
+
+  <!-- TAB: DASHBOARD -->
+  <div class="tab-content active" id="tab-dashboard">
+    <!-- KPIs -->
+    <div class="kpis">
+      <div class="kpi highlight">
+        <div class="kpi-label">Inversión Total</div>
+        <div class="kpi-value" id="k-inv">$0</div>
+        <div class="kpi-sub">MXN</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">TRP Total</div>
+        <div class="kpi-value" id="k-trp">0.0</div>
+        <div class="kpi-sub">puntos de rating</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Alcance Total</div>
+        <div class="kpi-value" id="k-alc">0.0%</div>
+        <div class="kpi-sub">de audiencia objetivo</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Frecuencia Prom.</div>
+        <div class="kpi-value" id="k-frec">—</div>
+        <div class="kpi-sub">impactos / persona</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Medios Activos</div>
+        <div class="kpi-value" id="k-activos">0</div>
+        <div class="kpi-sub">de <span id="k-total-medios">12</span> disponibles</div>
       </div>
     </div>
-    <table>
-      <thead>
-        <tr>
-          <th class="eh" style="text-align:left;min-width:110px">Medio ✎</th>
-          <th class="eh" style="min-width:130px">Inversión (MXN) ✎</th>
-          <th style="min-width:60px">SOI %</th>
-          <th class="eh" style="min-width:90px">CPR ($) ✎</th>
-          <th class="eh" style="min-width:85px">Alc. Máx % ✎</th>
-          <th class="eh" style="min-width:80px">Velocidad ✎</th>
-          <th style="min-width:65px">TRP</th>
-          <th style="min-width:75px">Alcance %</th>
-          <th style="min-width:100px">Alc. Increm.</th>
-          <th style="min-width:90px">Saturación</th>
-          <th style="min-width:36px"></th>
-        </tr>
-      </thead>
-      <tbody id="tabla-body"></tbody>
-      <tfoot>
-        <tr>
-          <td>TOTAL</td>
-          <td id="tot-inv">$0</td>
-          <td>100%</td>
-          <td>—</td>
-          <td>—</td>
-          <td>—</td>
-          <td id="tot-trp">0.0</td>
-          <td id="tot-alc">0.0%</td>
-          <td id="tot-incr">0.0%</td>
-          <td>—</td>
-          <td></td>
-        </tr>
-      </tfoot>
-    </table>
-  </div>
 
-  <!-- CHARTS ROW 1: Alcance + Distribución inversión -->
-  <div class="charts-grid">
-    <div class="chart-box">
-      <div class="chart-title">Alcance por Medio</div>
-      <div class="chart-sub">Eje X: Medio &nbsp;·&nbsp; Eje Y: Alcance (%)</div>
-      <div style="position:relative;height:260px">
-        <canvas id="cBar"></canvas>
-      </div>
-    </div>
-    <div class="chart-box">
-      <div class="chart-title">Distribución de Inversión</div>
-      <div class="chart-sub">Participación (SOI %) de cada medio sobre el presupuesto total</div>
-      <div style="display:flex;align-items:center;height:260px;gap:16px">
-        <div style="position:relative;height:240px;flex:0 0 200px">
-          <canvas id="cDonut"></canvas>
+    <!-- TABLA PRINCIPAL -->
+    <div class="table-wrap">
+      <div class="table-header">
+        <span>Tabla de Inversión por Medio</span>
+        <div class="row">
+          <span style="font-size:10px;color:#999">✎ <span style="color:#1a6eb5">Azul</span> = editable &nbsp;|&nbsp; Gris = calculado</span>
+          <button class="btn btn-outline" onclick="addMedio()">+ Agregar medio</button>
         </div>
-        <div id="donut-legend" class="legend" style="flex-direction:column;gap:5px"></div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th class="eh" style="text-align:left;min-width:110px">Medio ✎</th>
+            <th class="eh" style="min-width:130px">Inversión (MXN) ✎</th>
+            <th style="min-width:60px">SOI %</th>
+            <th class="eh" style="min-width:90px">CPR ($) ✎</th>
+            <th class="eh" style="min-width:85px">Alc. Máx % ✎</th>
+            <th class="eh" style="min-width:80px">Velocidad ✎</th>
+            <th style="min-width:65px">TRP</th>
+            <th style="min-width:75px">Alcance %</th>
+            <th style="min-width:100px">Alc. Increm.</th>
+            <th style="min-width:90px">Saturación</th>
+            <th style="min-width:36px"></th>
+          </tr>
+        </thead>
+        <tbody id="tabla-body"></tbody>
+        <tfoot>
+          <tr>
+            <td>TOTAL</td>
+            <td id="tot-inv">$0</td>
+            <td>100%</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td id="tot-trp">0.0</td>
+            <td id="tot-alc">0.0%</td>
+            <td id="tot-incr">0.0%</td>
+            <td>—</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- CHARTS ROW 1 -->
+    <div class="charts-grid">
+      <div class="chart-box">
+        <div class="chart-title">Alcance por Medio</div>
+        <div class="chart-sub">Eje X: Medio &nbsp;·&nbsp; Eje Y: Alcance (%)</div>
+        <div style="position:relative;height:260px"><canvas id="cBar"></canvas></div>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">Distribución de Inversión</div>
+        <div class="chart-sub">Participación (SOI %) de cada medio sobre el presupuesto total</div>
+        <div style="display:flex;align-items:center;height:260px;gap:16px">
+          <div style="position:relative;height:240px;flex:0 0 200px"><canvas id="cDonut"></canvas></div>
+          <div id="donut-legend" class="legend" style="flex-direction:column;gap:5px"></div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- CHARTS ROW 2: Alcance incremental + Curva TRP -->
-  <div class="charts-grid">
-    <div class="chart-box">
-      <div class="chart-title">Alcance Incremental por Medio</div>
-      <div class="chart-sub">Eje X: Medio &nbsp;·&nbsp; Eje Y: Alcance incremental adicional (%)</div>
-      <div style="position:relative;height:260px">
-        <canvas id="cIncr"></canvas>
+    <!-- CHARTS ROW 2 -->
+    <div class="charts-grid">
+      <div class="chart-box">
+        <div class="chart-title">Alcance Incremental por Medio</div>
+        <div class="chart-sub">Eje X: Medio &nbsp;·&nbsp; Eje Y: Alcance incremental adicional (%)</div>
+        <div style="position:relative;height:260px"><canvas id="cIncr"></canvas></div>
+        <div class="chart-note">Aportación única de cada medio al alcance total, descontando la audiencia ya alcanzada por otros medios</div>
       </div>
-      <div class="chart-note">Aportación única de cada medio al alcance total, descontando la audiencia ya alcanzada por otros medios</div>
-    </div>
-    <div class="chart-box">
-      <div class="chart-title">Curva de Alcance por TRP</div>
-      <div class="chart-sub">Eje X: TRP &nbsp;·&nbsp; Eje Y: Alcance (%) &nbsp;·&nbsp; Línea negra = mix total</div>
-      <div id="curve-legend" class="legend"></div>
-      <div style="position:relative;height:220px">
-        <canvas id="cLine"></canvas>
+      <div class="chart-box">
+        <div class="chart-title">Curva de Alcance por TRP</div>
+        <div class="chart-sub">Eje X: TRP &nbsp;·&nbsp; Eje Y: Alcance (%) &nbsp;·&nbsp; Línea negra = mix total</div>
+        <div id="curve-legend" class="legend"></div>
+        <div style="position:relative;height:220px"><canvas id="cLine"></canvas></div>
+        <div class="chart-note">Click en la leyenda para mostrar/ocultar un medio</div>
       </div>
-      <div class="chart-note">Click en la leyenda para mostrar/ocultar un medio</div>
     </div>
-  </div>
 
-  <!-- CHART ROW 3: Saturación -->
-  <div class="charts-grid">
-    <div class="chart-box">
-      <div class="chart-title">Saturación por Medio</div>
-      <div class="chart-sub">Eje X: Medio &nbsp;·&nbsp; Eje Y: % del alcance máximo alcanzado con la inversión actual</div>
-      <div style="position:relative;height:230px">
-        <canvas id="cSat"></canvas>
+    <!-- CHARTS ROW 3 -->
+    <div class="charts-grid">
+      <div class="chart-box">
+        <div class="chart-title">Saturación por Medio</div>
+        <div class="chart-sub">Eje X: Medio &nbsp;·&nbsp; Eje Y: % del alcance máximo alcanzado con la inversión actual</div>
+        <div style="position:relative;height:230px"><canvas id="cSat"></canvas></div>
+        <div class="chart-note">100% = medio completamente saturado. Ayuda a detectar dónde hay espacio para crecer.</div>
       </div>
-      <div class="chart-note">100% = medio completamente saturado. Ayuda a detectar dónde hay espacio para crecer.</div>
-    </div>
-    <div class="chart-box">
-      <div class="chart-title">TRP vs Alcance — Dispersión por Medio</div>
-      <div class="chart-sub">Eje X: TRP invertido &nbsp;·&nbsp; Eje Y: Alcance generado (%)</div>
-      <div style="position:relative;height:230px">
-        <canvas id="cScatter"></canvas>
+      <div class="chart-box">
+        <div class="chart-title">TRP vs Alcance — Dispersión por Medio</div>
+        <div class="chart-sub">Eje X: TRP invertido &nbsp;·&nbsp; Eje Y: Alcance generado (%)</div>
+        <div style="position:relative;height:230px"><canvas id="cScatter"></canvas></div>
+        <div class="chart-note">Medios en la parte superior izquierda tienen mejor eficiencia (más alcance con menos TRP)</div>
       </div>
-      <div class="chart-note">Medios en la parte superior izquierda tienen mejor eficiencia (más alcance con menos TRP)</div>
     </div>
-  </div>
+  </div><!-- /tab-dashboard -->
 
-</div><!-- /tab-dashboard -->
-
-<!-- ═══════════════════════════════════════════════════════════════ -->
-<!-- TAB: CAMPAÑA -->
-<!-- ═══════════════════════════════════════════════════════════════ -->
-<div class="tab-content" id="tab-campana">
-  <p class="section-label">Información de la Campaña</p>
-  <div class="form-row">
-    <div class="form-group">
-      <label>Nombre de campaña</label>
-      <input type="text" id="camp-nombre" placeholder="Ej. Campaña Q2 2025" style="width:240px" oninput="updateCampaignInfo()">
-    </div>
-    <div class="form-group">
-      <label>Cliente / Marca</label>
-      <input type="text" id="camp-cliente" placeholder="Ej. Marca XYZ" style="width:200px">
-    </div>
-    <div class="form-group">
-      <label>Presupuesto objetivo (MXN)</label>
-      <input type="number" id="camp-budget" placeholder="0" style="width:160px" step="100000" min="0">
-    </div>
-    <div class="form-group">
-      <label>Periodo</label>
-      <input type="text" id="camp-periodo" placeholder="Ej. Enero–Marzo 2025" style="width:180px">
-    </div>
-  </div>
-  <div class="form-row">
-    <div class="form-group">
-      <label>Target / Audiencia objetivo</label>
-      <input type="text" id="camp-target" placeholder="Ej. Hombres y mujeres 25–45 NSE A/B" style="width:360px">
-    </div>
-    <div class="form-group">
-      <label>Objetivos de campaña</label>
-      <textarea id="camp-objetivos" placeholder="Ej. Maximizar alcance en TV y digital..." style="width:320px"></textarea>
-    </div>
-  </div>
-  <hr class="sep">
-  <p class="section-label">Resumen de Simulación Actual</p>
-  <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-    <div class="kpi"><div class="kpi-label">Inversión planificada</div><div class="kpi-value" id="cs-inv">$0</div></div>
-    <div class="kpi"><div class="kpi-label">TRP Total</div><div class="kpi-value" id="cs-trp">0.0</div></div>
-    <div class="kpi"><div class="kpi-label">Alcance Total</div><div class="kpi-value" id="cs-alc">0.0%</div></div>
-    <div class="kpi"><div class="kpi-label">Frecuencia</div><div class="kpi-value" id="cs-frec">—</div></div>
-  </div>
-</div><!-- /tab-campana -->
-
-<!-- ═══════════════════════════════════════════════════════════════ -->
-<!-- TAB: ESCENARIOS -->
-<!-- ═══════════════════════════════════════════════════════════════ -->
-<div class="tab-content" id="tab-escenarios">
-  <div class="row" style="margin-bottom:14px;justify-content:space-between">
-    <p class="section-label" style="margin:0">Escenarios guardados</p>
-    <div class="row">
-      <button class="btn btn-primary" onclick="saveScenario()">💾 Guardar escenario actual</button>
-      <button class="btn btn-outline" onclick="clearScenarios()">🗑 Limpiar todos</button>
-    </div>
-  </div>
-
-  <div id="scenario-list" class="scenario-list">
-    <div class="empty-state">No hay escenarios guardados.<br>Configura una simulación y guárdala.</div>
-  </div>
-
-  <hr class="sep">
-  <p class="section-label">Comparativo de escenarios</p>
-  <div id="compare-area">
-    <div class="empty-state">Guarda al menos 2 escenarios para comparar.</div>
-  </div>
-</div><!-- /tab-escenarios -->
-
-<!-- ═══════════════════════════════════════════════════════════════ -->
-<!-- TAB: EXPORTAR -->
-<!-- ═══════════════════════════════════════════════════════════════ -->
-<div class="tab-content" id="tab-exportar">
-  <div class="export-section">
-    <div class="export-title">📄 Exportar reporte en PDF</div>
-    <p style="font-size:12px;color:#666;margin-bottom:12px">Se generará un PDF con la tabla completa de medios, KPIs y todas las gráficas del dashboard.</p>
+  <!-- TAB: CAMPAÑA -->
+  <div class="tab-content" id="tab-campana">
+    <p class="section-label">Información de la Campaña</p>
     <div class="form-row">
       <div class="form-group">
-        <label>Título del reporte</label>
-        <input type="text" id="exp-titulo" placeholder="Reporte de Planeación de Medios" style="width:300px">
+        <label>Nombre de campaña</label>
+        <input type="text" id="camp-nombre" placeholder="Ej. Campaña Q2 2025" style="width:240px" oninput="updateCampaignInfo()">
       </div>
       <div class="form-group">
-        <label>Fecha</label>
-        <input type="text" id="exp-fecha" style="width:160px">
+        <label>Cliente / Marca</label>
+        <input type="text" id="camp-cliente" placeholder="Ej. Marca XYZ" style="width:200px">
+      </div>
+      <div class="form-group">
+        <label>Presupuesto objetivo (MXN)</label>
+        <input type="number" id="camp-budget" placeholder="0" style="width:160px" step="100000" min="0">
+      </div>
+      <div class="form-group">
+        <label>Periodo</label>
+        <input type="text" id="camp-periodo" placeholder="Ej. Enero–Marzo 2025" style="width:180px">
       </div>
     </div>
-    <button class="btn btn-dark" onclick="exportPDF()" style="font-size:13px;padding:8px 20px">⬇ Exportar PDF</button>
-  </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Target / Audiencia objetivo</label>
+        <input type="text" id="camp-target" placeholder="Ej. Hombres y mujeres 25–45 NSE A/B" style="width:360px">
+      </div>
+      <div class="form-group">
+        <label>Objetivos de campaña</label>
+        <textarea id="camp-objetivos" placeholder="Ej. Maximizar alcance en TV y digital..." style="width:320px"></textarea>
+      </div>
+    </div>
+    <hr class="sep">
+    <p class="section-label">Resumen de Simulación Actual</p>
+    <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi"><div class="kpi-label">Inversión planificada</div><div class="kpi-value" id="cs-inv">$0</div></div>
+      <div class="kpi"><div class="kpi-label">TRP Total</div><div class="kpi-value" id="cs-trp">0.0</div></div>
+      <div class="kpi"><div class="kpi-label">Alcance Total</div><div class="kpi-value" id="cs-alc">0.0%</div></div>
+      <div class="kpi"><div class="kpi-label">Frecuencia</div><div class="kpi-value" id="cs-frec">—</div></div>
+    </div>
+  </div><!-- /tab-campana -->
 
-  <div class="export-section">
-    <div class="export-title">📋 Vista previa de datos</div>
-    <p style="font-size:12px;color:#666;margin-bottom:10px">Resumen de los datos actuales que se incluirán en el reporte.</p>
-    <div id="preview-data" style="font-size:12px;color:#555;line-height:1.8"></div>
-  </div>
-</div><!-- /tab-exportar -->
+  <!-- TAB: ESCENARIOS -->
+  <div class="tab-content" id="tab-escenarios">
+    <div class="row" style="margin-bottom:14px;justify-content:space-between">
+      <p class="section-label" style="margin:0">Escenarios guardados</p>
+      <div class="row">
+        <button class="btn btn-primary" onclick="saveScenario()">💾 Guardar escenario actual</button>
+        <button class="btn btn-outline" onclick="clearScenarios()">🗑 Limpiar todos</button>
+      </div>
+    </div>
+    <div id="scenario-list" class="scenario-list">
+      <div class="empty-state">No hay escenarios guardados.<br>Configura una simulación y guárdala.</div>
+    </div>
+    <hr class="sep">
+    <p class="section-label">Comparativo de escenarios</p>
+    <div id="compare-area">
+      <div class="empty-state">Guarda al menos 2 escenarios para comparar.</div>
+    </div>
+  </div><!-- /tab-escenarios -->
+
+  <!-- TAB: EXPORTAR -->
+  <div class="tab-content" id="tab-exportar">
+    <div class="export-section">
+      <div class="export-title">📄 Exportar reporte en PDF</div>
+      <p style="font-size:12px;color:#666;margin-bottom:12px">Se generará un PDF con la tabla completa de medios, KPIs y todas las gráficas del dashboard.</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Título del reporte</label>
+          <input type="text" id="exp-titulo" placeholder="Reporte de Planeación de Medios" style="width:300px">
+        </div>
+        <div class="form-group">
+          <label>Fecha</label>
+          <input type="text" id="exp-fecha" style="width:160px">
+        </div>
+      </div>
+      <button class="btn btn-dark" onclick="exportPDF()" style="font-size:13px;padding:8px 20px">⬇ Exportar PDF</button>
+    </div>
+    <div class="export-section">
+      <div class="export-title">📋 Vista previa de datos</div>
+      <p style="font-size:12px;color:#666;margin-bottom:10px">Resumen de los datos actuales que se incluirán en el reporte.</p>
+      <div id="preview-data" style="font-size:12px;color:#555;line-height:1.8"></div>
+    </div>
+  </div><!-- /tab-exportar -->
 
 </div><!-- /app -->
 
-<!-- ─── SCRIPT ─────────────────────────────────────────────────────── -->
-<script>
-// ══════════════════════════════════════════════════════════════
-// DATA
-// ══════════════════════════════════════════════════════════════
-let medios = [
-  { n:'TV Abierta',  inv:0, cpr:29000,   am:97, v:190 },
-  { n:'TV Local',    inv:0, cpr:22000,   am:40, v:300 },
-  { n:'TV Paga',     inv:0, cpr:23000,   am:45, v:300 },
-  { n:'Internet',    inv:0, cpr:24359,   am:90, v:280 },
-  { n:'OOH',         inv:0, cpr:33233,   am:36, v:300 },
-  { n:'Cine',        inv:0, cpr:251000,  am:5,  v:350 },
-  { n:'Radio',       inv:0, cpr:119000,  am:28, v:250 },
-  { n:'Prensa',      inv:0, cpr:78321,   am:18, v:250 },
-  { n:'Revistas',    inv:0, cpr:115937,  am:20, v:250 },
-  { n:'Redes',       inv:0, cpr:25000,   am:70, v:150 },
-  { n:'CTV',         inv:0, cpr:13043,   am:30, v:200 },
-  { n:'Programatic', inv:0, cpr:20000,   am:55, v:200 }
-];
-
-const COLORS = [
-  '#2471A3','#1E8449','#48C9B0','#7D3C98','#CA6F1E',
-  '#C0392B','#D4AC0D','#717D7E','#27AE60','#1A5276',
-  '#117864','#F39C12'
-];
-
-let scenarios = [];
-let globalCalc = { tInv:0, tTRP:0, tAlc:0, freq:0, rs:[] };
-
-// ══════════════════════════════════════════════════════════════
-// FORMULAS
-// ══════════════════════════════════════════════════════════════
-// Reach curve: AlcMax × (1 - e^(-TRP / (2 × Velocidad)))
-// Calibrado vs datos reales del Excel (error < 2%)
-function calcReach(trp, am, v) {
-  if (!trp || trp <= 0 || !am || !v) return 0;
-  return am * (1 - Math.exp(-trp / (2 * v)));
-}
-
-// Total reach via independence model (approximation of duplication)
-// Alc_total = (1 - ∏(1 - r_i/100)) × 100
-function calcTotalReach(reaches) {
-  let f = 1;
-  reaches.forEach(r => f *= (1 - r / 100));
-  return (1 - f) * 100;
-}
-
-// Incremental reach: contribution of each medium ordered by size
-// Δ_i = AlcTotal(all) - AlcTotal(all except i)
-function calcIncrementalReach(reaches) {
-  const total = calcTotalReach(reaches);
-  return reaches.map((_, i) => {
-    const without = reaches.filter((_, j) => j !== i);
-    return total - calcTotalReach(without);
-  });
-}
-
-// Saturation: how much of the max potential reach is being used
-// Sat_i = reach_i / am_i * 100
-function calcSaturation(m) {
-  if (!m.am || m.am === 0) return 0;
-  return (m.reach / m.am) * 100;
-}
-
-// ══════════════════════════════════════════════════════════════
-// CALC ENGINE
-// ══════════════════════════════════════════════════════════════
-function recalc() {
-  const tInv = medios.reduce((s, m) => s + (m.inv || 0), 0);
-
-  medios.forEach(m => {
-    m.trp   = (m.cpr > 0 && m.inv > 0) ? m.inv / m.cpr : 0;
-    m.soi   = tInv > 0 ? (m.inv / tInv * 100) : 0;
-    m.reach = calcReach(m.trp, m.am, m.v);
-    m.sat   = calcSaturation(m);
-  });
-
-  const reaches   = medios.map(m => m.reach);
-  const increms   = calcIncrementalReach(reaches);
-  medios.forEach((m, i) => m.incr = increms[i]);
-
-  const tTRP  = medios.reduce((s, m) => s + m.trp, 0);
-  const tAlc  = calcTotalReach(reaches);
-  const freq  = tAlc > 0.01 ? tTRP / tAlc : 0;
-  const tIncr = medios.reduce((s, m) => s + m.incr, 0);
-  const activos = medios.filter(m => m.inv > 0).length;
-
-  globalCalc = { tInv, tTRP, tAlc, freq, tIncr, activos, rs: medios.map(m=>({...m})) };
-
-  updateTable(tInv, tTRP, tAlc, tIncr, activos);
-  updateKPIs(tInv, tTRP, tAlc, freq, activos);
-  updateCampaignTab(tInv, tTRP, tAlc, freq);
-  updateCharts(tInv);
-  updateExportPreview();
-}
-
-// ══════════════════════════════════════════════════════════════
-// TABLE
-// ══════════════════════════════════════════════════════════════
-function buildTable() {
-  const tbody = document.getElementById('tabla-body');
-  tbody.innerHTML = '';
-  medios.forEach((m, i) => {
-    const tr = document.createElement('tr');
-    tr.id = 'row-' + i;
-    tr.innerHTML = `
-      <td style="padding:3px 9px;min-width:110px">
-        <div style="display:flex;align-items:center;gap:0">
-          <span class="dot" style="background:${COLORS[i % COLORS.length]}"></span>
-          <input class="ci-text" id="nm-${i}" value="${m.n}"
-            oninput="medios[${i}].n=this.value; refreshLabels()" aria-label="Nombre del medio ${i+1}">
-        </div>
-      </td>
-      <td style="padding:3px 9px">
-        <input type="number" class="ci" id="inv-${i}" value="${m.inv}" min="0" step="100000"
-          oninput="medios[${i}].inv=+this.value||0; recalc()" aria-label="Inversión">
-      </td>
-      <td class="calc" id="soi-${i}">0.0%</td>
-      <td style="padding:3px 9px">
-        <input type="number" class="ci" id="cpr-${i}" value="${m.cpr}" min="1" step="500"
-          oninput="medios[${i}].cpr=+this.value||1; recalc()" aria-label="CPR">
-      </td>
-      <td style="padding:3px 9px">
-        <input type="number" class="ci" id="am-${i}" value="${m.am}" min="0" max="100" step="0.5"
-          oninput="medios[${i}].am=+this.value||0; recalc()" aria-label="Alcance máximo">
-      </td>
-      <td style="padding:3px 9px">
-        <input type="number" class="ci" id="vel-${i}" value="${m.v}" min="1" step="10"
-          oninput="medios[${i}].v=+this.value||1; recalc()" aria-label="Velocidad">
-      </td>
-      <td class="calc" id="trp-${i}">0.0</td>
-      <td class="calc" id="alc-${i}">0.0%</td>
-      <td class="pos" id="incr-${i}" style="font-size:11px">0.0%</td>
-      <td id="sat-${i}" style="padding:4px 9px;min-width:90px">
-        <div style="display:flex;align-items:center;gap:5px">
-          <div class="bar-wrap"><div class="bar-fill" id="satbar-${i}" style="width:0%;background:${COLORS[i%COLORS.length]}"></div></div>
-          <span class="calc" id="satpct-${i}" style="font-size:11px">0%</span>
-        </div>
-      </td>
-      <td style="text-align:center;padding:2px 5px">
-        <button class="btn btn-danger" style="padding:2px 6px;font-size:10px" onclick="removeMedio(${i})" title="Eliminar medio">×</button>
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
-function updateTable(tInv, tTRP, tAlc, tIncr, activos) {
-  medios.forEach((m, i) => {
-    const s = id => document.getElementById(id + '-' + i);
-    if (s('soi'))    s('soi').textContent    = m.soi.toFixed(1) + '%';
-    if (s('trp'))    s('trp').textContent    = m.trp.toFixed(1);
-    if (s('alc'))    s('alc').textContent    = m.reach.toFixed(1) + '%';
-    if (s('incr'))   s('incr').textContent   = '+' + m.incr.toFixed(2) + '%';
-    if (s('satpct')) s('satpct').textContent = m.sat.toFixed(0) + '%';
-    if (s('satbar')) s('satbar').style.width = Math.min(m.sat, 100).toFixed(1) + '%';
-  });
-  document.getElementById('tot-inv').textContent  = fmtMXN(tInv);
-  document.getElementById('tot-trp').textContent  = tTRP.toFixed(1);
-  document.getElementById('tot-alc').textContent  = tAlc.toFixed(1) + '%';
-  document.getElementById('tot-incr').textContent = tIncr.toFixed(1) + '%';
-}
-
-function addMedio() {
-  const idx = medios.length;
-  medios.push({ n: 'Nuevo medio ' + (idx+1), inv: 0, cpr: 25000, am: 50, v: 200 });
-  buildTable();
-  recalc();
-  refreshChartLabels();
-}
-
-function removeMedio(i) {
-  if (medios.length <= 1) return alert('Debe haber al menos un medio.');
-  medios.splice(i, 1);
-  buildTable();
-  recalc();
-  refreshChartLabels();
-}
-
-// ══════════════════════════════════════════════════════════════
-// KPIs
-// ══════════════════════════════════════════════════════════════
-function updateKPIs(tInv, tTRP, tAlc, freq, activos) {
-  document.getElementById('k-inv').textContent    = fmtMXN(tInv);
-  document.getElementById('k-trp').textContent    = tTRP.toFixed(1);
-  document.getElementById('k-alc').textContent    = tAlc.toFixed(1) + '%';
-  document.getElementById('k-frec').textContent   = freq > 0 ? freq.toFixed(2) + 'x' : '—';
-  document.getElementById('k-activos').textContent = activos;
-  document.getElementById('k-total-medios').textContent = medios.length;
-}
-
-// ══════════════════════════════════════════════════════════════
-// CAMPAIGN TAB
-// ══════════════════════════════════════════════════════════════
-function updateCampaignInfo() {
-  const name = document.getElementById('camp-nombre').value || '— Sin campaña activa';
-  document.getElementById('topbar-campaign').textContent = name ? '— ' + name : '— Sin campaña activa';
-}
-
-function updateCampaignTab(tInv, tTRP, tAlc, freq) {
-  document.getElementById('cs-inv').textContent  = fmtMXN(tInv);
-  document.getElementById('cs-trp').textContent  = tTRP.toFixed(1);
-  document.getElementById('cs-alc').textContent  = tAlc.toFixed(1) + '%';
-  document.getElementById('cs-frec').textContent = freq > 0 ? freq.toFixed(2) + 'x' : '—';
-}
-
-// ══════════════════════════════════════════════════════════════
-// SCENARIOS
-// ══════════════════════════════════════════════════════════════
-function saveScenario() {
-  const name = prompt('Nombre para este escenario:', 'Escenario ' + (scenarios.length + 1));
-  if (!name) return;
-  const sc = {
-    id: Date.now(),
-    name,
-    fecha: new Date().toLocaleDateString('es-MX'),
-    medios: medios.map(m => ({...m})),
-    kpis: { ...globalCalc }
-  };
-  scenarios.push(sc);
-  renderScenarios();
-}
-
-function loadScenario(id) {
-  const sc = scenarios.find(s => s.id === id);
-  if (!sc) return;
-  medios = sc.medios.map(m => ({...m}));
-  buildTable();
-  recalc();
-  refreshChartLabels();
-  showTab('dashboard');
-}
-
-function duplicateScenario(id) {
-  const sc = scenarios.find(s => s.id === id);
-  if (!sc) return;
-  const name = prompt('Nombre para el duplicado:', sc.name + ' (copia)');
-  if (!name) return;
-  scenarios.push({ ...sc, id: Date.now(), name, fecha: new Date().toLocaleDateString('es-MX') });
-  renderScenarios();
-}
-
-function deleteScenario(id) {
-  scenarios = scenarios.filter(s => s.id !== id);
-  renderScenarios();
-}
-
-function clearScenarios() {
-  if (!confirm('¿Eliminar todos los escenarios guardados?')) return;
-  scenarios = [];
-  renderScenarios();
-}
-
-function renderScenarios() {
-  const list = document.getElementById('scenario-list');
-  if (!scenarios.length) {
-    list.innerHTML = '<div class="empty-state">No hay escenarios guardados.<br>Configura una simulación y guárdala.</div>';
-  } else {
-    list.innerHTML = scenarios.map(sc => `
-      <div class="scenario-card">
-        <div>
-          <strong style="font-size:13px">${sc.name}</strong>
-          <div class="scenario-meta">${sc.fecha} &nbsp;·&nbsp; ${sc.medios.filter(m=>m.inv>0).length} medios activos &nbsp;·&nbsp; Inv: ${fmtMXN(sc.kpis.tInv)} &nbsp;·&nbsp; Alc: ${sc.kpis.tAlc.toFixed(1)}% &nbsp;·&nbsp; TRP: ${sc.kpis.tTRP.toFixed(1)}</div>
-        </div>
-        <div class="sc-actions">
-          <button class="btn btn-primary" onclick="loadScenario(${sc.id})">Cargar</button>
-          <button class="btn btn-outline" onclick="duplicateScenario(${sc.id})">Duplicar</button>
-          <button class="btn btn-danger" onclick="deleteScenario(${sc.id})">Eliminar</button>
-        </div>
-      </div>
-    `).join('');
-  }
-
-  // Compare table
-  const ca = document.getElementById('compare-area');
-  if (scenarios.length < 2) {
-    ca.innerHTML = '<div class="empty-state">Guarda al menos 2 escenarios para comparar.</div>';
-    return;
-  }
-  const cols = scenarios.map(sc => `<th style="min-width:110px">${sc.name}</th>`).join('');
-  const rowData = (label, fn) =>
-    `<tr><td style="text-align:left;font-weight:bold;background:#f5f5f5">${label}</td>${scenarios.map(sc => `<td class="calc">${fn(sc)}</td>`).join('')}</tr>`;
-
-  ca.innerHTML = `
-    <div class="compare-box">
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead><tr>
-          <th style="text-align:left;min-width:140px">Métrica</th>${cols}
-        </tr></thead>
-        <tbody>
-          ${rowData('Inversión Total',      sc => fmtMXN(sc.kpis.tInv))}
-          ${rowData('TRP Total',            sc => sc.kpis.tTRP.toFixed(1))}
-          ${rowData('Alcance Total (%)',    sc => sc.kpis.tAlc.toFixed(2) + '%')}
-          ${rowData('Frecuencia Prom.',     sc => sc.kpis.freq > 0 ? sc.kpis.freq.toFixed(2) + 'x' : '—')}
-          ${rowData('Medios Activos',       sc => sc.medios.filter(m=>m.inv>0).length)}
-          ${rowData('Alcance Incremental', sc => sc.kpis.tIncr ? sc.kpis.tIncr.toFixed(2)+'%' : '—')}
-        </tbody>
-      </table>
-    </div>`;
-}
-
-// ══════════════════════════════════════════════════════════════
-// CHARTS
-// ══════════════════════════════════════════════════════════════
-let cBar, cDonut, cIncr, cLine, cSat, cScatter;
-const TRP_PTS = Array.from({length:61}, (_,i) => i * 10); // 0..600
-
-const chartDefaults = {
-  gridColor: 'rgba(0,0,0,0.06)',
-  labelColor: '#999',
-  tick: { color: '#999', font: { size: 10 } }
-};
-
-function initCharts() {
-  const { gridColor, labelColor, tick } = chartDefaults;
-
-  // 1. BAR — Alcance por medio
-  cBar = new Chart(document.getElementById('cBar'), {
-    type: 'bar',
-    data: { labels: medios.map(m=>m.n), datasets: [{ label:'Alcance %', data: medios.map(()=>0), backgroundColor: COLORS, borderRadius: 3, borderSkipped: false }] },
-    options: { responsive:true, maintainAspectRatio:false,
-      plugins: { legend:{display:false}, tooltip:{callbacks:{label:c=>' Alcance: '+c.raw.toFixed(2)+'%'}} },
-      scales: {
-        x: { ticks:{...tick,maxRotation:40}, grid:{display:false} },
-        y: { ticks:{...tick,callback:v=>v+'%'}, grid:{color:gridColor}, min:0, max:100 }
-      }
-    }
-  });
-
-  // 2. DONUT — Distribución de inversión
-  cDonut = new Chart(document.getElementById('cDonut'), {
-    type: 'doughnut',
-    data: { labels: medios.map(m=>m.n), datasets: [{ data: medios.map(()=>0), backgroundColor: COLORS, borderWidth: 1, borderColor: '#fff' }] },
-    options: { responsive:true, maintainAspectRatio:false, cutout:'65%',
-      plugins: {
-        legend: { display:false },
-        tooltip: { callbacks: { label: c => ' ' + c.label + ': ' + c.raw.toFixed(1) + '%' } }
-      }
-    }
-  });
-  buildDonutLegend();
-
-  // 3. BAR — Alcance incremental
-  cIncr = new Chart(document.getElementById('cIncr'), {
-    type: 'bar',
-    data: { labels: medios.map(m=>m.n), datasets: [{ label:'Alc. incremental %', data: medios.map(()=>0), backgroundColor: COLORS, borderRadius: 3, borderSkipped: false }] },
-    options: { responsive:true, maintainAspectRatio:false,
-      plugins: { legend:{display:false}, tooltip:{callbacks:{label:c=>' +'+c.raw.toFixed(3)+'%'}} },
-      scales: {
-        x: { ticks:{...tick,maxRotation:40}, grid:{display:false} },
-        y: { ticks:{...tick,callback:v=>v+'%'}, grid:{color:gridColor}, min:0 }
-      }
-    }
-  });
-
-  // 4. LINE — Curva de alcance por TRP (por medio + total)
-  const lineDS = medios.map((m,i)=>({
-    label: m.n, data: TRP_PTS.map(t => parseFloat(calcReach(t,m.am,m.v).toFixed(2))),
-    borderColor: COLORS[i], backgroundColor:'transparent', borderWidth:1.5, pointRadius:0, tension:0.3
-  }));
-  lineDS.push({
-    label: 'TOTAL', data: TRP_PTS.map(t => {
-      const tInv = medios.reduce((s,m)=>s+m.inv,0);
-      let f=1; medios.forEach(m=>{ const soi=tInv>0?m.inv/tInv:1/medios.length; f*=(1-calcReach(t*soi,m.am,m.v)/100); });
-      return parseFloat(((1-f)*100).toFixed(2));
-    }),
-    borderColor:'#111', backgroundColor:'transparent', borderWidth:2.5, pointRadius:0, tension:0.3, borderDash:[5,3]
-  });
-
-  cLine = new Chart(document.getElementById('cLine'), {
-    type:'line', data:{ labels:TRP_PTS, datasets:lineDS },
-    options:{ responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{display:false}, tooltip:{ mode:'index', intersect:false, callbacks:{
-        title:c=>'TRP: '+c[0].label, label:c=>' '+c.dataset.label+': '+c.raw.toFixed(1)+'%'
-      }}},
-      scales:{
-        x:{ title:{display:true,text:'TRP',font:{size:10},color:labelColor}, ticks:{...tick,autoSkip:true,maxTicksLimit:10}, grid:{display:false} },
-        y:{ title:{display:true,text:'Alcance (%)',font:{size:10},color:labelColor}, ticks:{...tick,callback:v=>v+'%'}, grid:{color:gridColor}, min:0, max:100 }
-      },
-      interaction:{mode:'nearest',axis:'x',intersect:false}
-    }
-  });
-  buildCurveLegend();
-
-  // 5. BAR — Saturación
-  cSat = new Chart(document.getElementById('cSat'), {
-    type:'bar',
-    data:{ labels:medios.map(m=>m.n), datasets:[{ label:'Saturación %', data:medios.map(()=>0), backgroundColor:COLORS.map(c=>c+'99'), borderColor:COLORS, borderWidth:1, borderRadius:3, borderSkipped:false }] },
-    options:{ responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>' Saturación: '+c.raw.toFixed(1)+'%'}} },
-      scales:{
-        x:{ ticks:{...tick,maxRotation:40}, grid:{display:false} },
-        y:{ ticks:{...tick,callback:v=>v+'%'}, grid:{color:gridColor}, min:0, max:100,
-          title:{display:true,text:'% del potencial máximo usado',font:{size:10},color:labelColor} }
-      }
-    }
-  });
-
-  // 6. SCATTER — TRP vs Alcance eficiencia
-  cScatter = new Chart(document.getElementById('cScatter'), {
-    type:'bubble',
-    data:{ datasets: medios.map((m,i)=>({ label:m.n, data:[{x:0,y:0,r:5}], backgroundColor:COLORS[i]+'cc', borderColor:COLORS[i] })) },
-    options:{ responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{display:false}, tooltip:{callbacks:{ label:c=>` ${c.dataset.label}: TRP=${c.raw.x.toFixed(1)}, Alcance=${c.raw.y.toFixed(1)}%` }} },
-      scales:{
-        x:{ title:{display:true,text:'TRP invertido',font:{size:10},color:labelColor}, ticks:{...tick}, grid:{color:gridColor} },
-        y:{ title:{display:true,text:'Alcance (%)',font:{size:10},color:labelColor}, ticks:{...tick,callback:v=>v+'%'}, grid:{color:gridColor}, min:0, max:100 }
-      }
-    }
-  });
-}
-
-function buildDonutLegend() {
-  const el = document.getElementById('donut-legend');
-  el.innerHTML = '';
-  medios.forEach((m,i)=>{
-    const item = document.createElement('div');
-    item.className = 'legend-item';
-    item.innerHTML = `<span class="dot" style="background:${COLORS[i%COLORS.length]}"></span><span id="dl-${i}">${m.n}</span>`;
-    el.appendChild(item);
-  });
-}
-
-function buildCurveLegend() {
-  const el = document.getElementById('curve-legend');
-  el.innerHTML = '';
-  [...medios.map((m,i)=>({n:m.n,c:COLORS[i%COLORS.length]})), {n:'TOTAL',c:'#111'}].forEach((item,i)=>{
-    const isTotal = i === medios.length;
-    const span = document.createElement('span');
-    span.className = 'legend-item';
-    span.innerHTML = `<span class="legend-line" style="background:${item.c};${isTotal?'border-bottom:2px dashed #111;background:transparent':''}"></span>${item.n}`;
-    span.onclick = () => {
-      if (!cLine) return;
-      const ds = cLine.data.datasets[i];
-      ds.hidden = !ds.hidden;
-      span.style.opacity = ds.hidden ? '0.3' : '1';
-      cLine.update();
-    };
-    el.appendChild(span);
-  });
-}
-
-function refreshChartLabels() {
-  if (cBar)    cBar.data.labels = medios.map(m=>m.n);
-  if (cDonut)  cDonut.data.labels = medios.map(m=>m.n);
-  if (cIncr)   cIncr.data.labels = medios.map(m=>m.n);
-  if (cSat)    cSat.data.labels = medios.map(m=>m.n);
-  buildDonutLegend();
-  buildCurveLegend();
-}
-
-function refreshLabels() {
-  medios.forEach((m,i)=>{
-    const dl = document.getElementById('dl-'+i);
-    if(dl) dl.textContent = m.n;
-  });
-  if(cBar)   cBar.data.labels[medios.findIndex((m,i)=>document.getElementById('nm-'+i)?.value===m.n)] = '';
-  recalc();
-}
-
-function updateCharts(tInv) {
-  if (!cBar) return;
-
-  // Bar - alcance
-  cBar.data.labels = medios.map(m=>m.n);
-  cBar.data.datasets[0].data = medios.map(m => parseFloat(m.reach.toFixed(2)));
-  cBar.update('none');
-
-  // Donut - SOI
-  cDonut.data.labels = medios.map(m=>m.n);
-  cDonut.data.datasets[0].data = medios.map(m => parseFloat(m.soi.toFixed(2)));
-  cDonut.update('none');
-
-  // Incr - incremental reach
-  cIncr.data.labels = medios.map(m=>m.n);
-  cIncr.data.datasets[0].data = medios.map(m => parseFloat(m.incr.toFixed(3)));
-  cIncr.update('none');
-
-  // Line - curves per medium + total (update params in case they changed)
-  medios.forEach((m,i) => {
-    if (!cLine.data.datasets[i]) return;
-    cLine.data.datasets[i].label = m.n;
-    cLine.data.datasets[i].data = TRP_PTS.map(t => parseFloat(calcReach(t,m.am,m.v).toFixed(2)));
-  });
-  // total line
-  const totalIdx = medios.length;
-  if (cLine.data.datasets[totalIdx]) {
-    cLine.data.datasets[totalIdx].data = TRP_PTS.map(t => {
-      let f=1;
-      medios.forEach(m => {
-        const soi = tInv > 0 ? m.inv/tInv : 1/medios.length;
-        f *= (1 - calcReach(t*soi, m.am, m.v)/100);
-      });
-      return parseFloat(((1-f)*100).toFixed(2));
-    });
-  }
-  cLine.update('none');
-
-  // Sat
-  cSat.data.labels = medios.map(m=>m.n);
-  cSat.data.datasets[0].data = medios.map(m => parseFloat(m.sat.toFixed(1)));
-  cSat.update('none');
-
-  // Scatter
-  medios.forEach((m,i) => {
-    if (!cScatter.data.datasets[i]) return;
-    cScatter.data.datasets[i].label = m.n;
-    cScatter.data.datasets[i].data = m.trp > 0
-      ? [{ x: parseFloat(m.trp.toFixed(1)), y: parseFloat(m.reach.toFixed(1)), r: 6 }]
-      : [{ x:0, y:0, r:0 }];
-  });
-  cScatter.update('none');
-}
-
-// ══════════════════════════════════════════════════════════════
-// EXPORT PDF
-// ══════════════════════════════════════════════════════════════
-function exportPDF() {
-  const titulo = document.getElementById('exp-titulo').value || 'Reporte de Planeación de Medios';
-  const fecha  = document.getElementById('exp-fecha').value || new Date().toLocaleDateString('es-MX');
-  const { tInv, tTRP, tAlc, freq } = globalCalc;
-
-  const rows = medios.map(m => `
-    <tr>
-      <td>${m.n}</td>
-      <td>${fmtMXN(m.inv)}</td>
-      <td>${m.soi.toFixed(1)}%</td>
-      <td>$${m.cpr.toLocaleString()}</td>
-      <td>${m.am}%</td>
-      <td>${m.v}</td>
-      <td>${m.trp.toFixed(1)}</td>
-      <td>${m.reach.toFixed(2)}%</td>
-      <td>+${m.incr.toFixed(2)}%</td>
-      <td>${m.sat.toFixed(0)}%</td>
-    </tr>`).join('');
-
-  const win = window.open('', '_blank');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>${titulo}</title>
-  <style>
-    body { font-family: Arial, sans-serif; font-size: 12px; color: #111; margin: 30px; }
-    h1 { font-size: 18px; margin-bottom: 4px; }
-    .meta { font-size: 11px; color: #888; margin-bottom: 20px; }
-    .kpis { display: flex; gap: 16px; margin-bottom: 20px; }
-    .kpi { border: 1px solid #ddd; padding: 10px 14px; flex: 1; }
-    .kl { font-size: 9px; text-transform: uppercase; color: #999; margin-bottom: 3px; }
-    .kv { font-size: 18px; font-weight: bold; font-family: monospace; }
-    table { border-collapse: collapse; width: 100%; font-size: 11px; }
-    th { background: #f0f0f0; text-align: right; padding: 5px 8px; border: 1px solid #ccc; font-size: 10px; }
-    th:first-child { text-align: left; }
-    td { padding: 4px 8px; border: 1px solid #eee; text-align: right; }
-    td:first-child { text-align: left; }
-    tfoot td { background: #eee; font-weight: bold; border-top: 2px solid #ccc; }
-    @media print { body { margin: 15px; } }
-  </style></head><body>
-  <h1>${titulo}</h1>
-  <div class="meta">Generado el ${fecha} &nbsp;|&nbsp; Budget Allocator — Planeador de Inversión Publicitaria</div>
-  <div class="kpis">
-    <div class="kpi"><div class="kl">Inversión Total</div><div class="kv">${fmtMXN(tInv)}</div></div>
-    <div class="kpi"><div class="kl">TRP Total</div><div class="kv">${tTRP.toFixed(1)}</div></div>
-    <div class="kpi"><div class="kl">Alcance Total</div><div class="kv">${tAlc.toFixed(1)}%</div></div>
-    <div class="kpi"><div class="kl">Frecuencia Prom.</div><div class="kv">${freq > 0 ? freq.toFixed(2)+'x' : '—'}</div></div>
-  </div>
-  <table>
-    <thead><tr>
-      <th>Medio</th><th>Inversión</th><th>SOI %</th><th>CPR</th>
-      <th>Alc. Máx</th><th>Velocidad</th><th>TRP</th><th>Alcance %</th>
-      <th>Alc. Increm.</th><th>Saturación</th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-    <tfoot><tr>
-      <td>TOTAL</td><td>${fmtMXN(tInv)}</td><td>100%</td>
-      <td>—</td><td>—</td><td>—</td>
-      <td>${tTRP.toFixed(1)}</td><td>${tAlc.toFixed(1)}%</td>
-      <td>${globalCalc.tIncr?.toFixed(1)??'—'}%</td><td>—</td>
-    </tr></tfoot>
-  </table>
-  <script>window.onload=()=>window.print()<\/script>
-  </body></html>`);
-  win.document.close();
-}
-
-function updateExportPreview() {
-  const { tInv, tTRP, tAlc, freq } = globalCalc;
-  const activos = medios.filter(m=>m.inv>0);
-  document.getElementById('preview-data').innerHTML = `
-    <strong>Medios con inversión:</strong> ${activos.length > 0 ? activos.map(m=>m.n).join(', ') : 'Ninguno'}<br>
-    <strong>Inversión Total:</strong> ${fmtMXN(tInv)}<br>
-    <strong>TRP Total:</strong> ${tTRP.toFixed(1)}<br>
-    <strong>Alcance Total:</strong> ${tAlc.toFixed(1)}%<br>
-    <strong>Frecuencia:</strong> ${freq > 0 ? freq.toFixed(2)+'x' : '—'}
-  `;
-  document.getElementById('exp-fecha').value = new Date().toLocaleDateString('es-MX');
-}
-
-// ══════════════════════════════════════════════════════════════
-// TABS
-// ══════════════════════════════════════════════════════════════
-function showTab(name) {
-  document.querySelectorAll('.tab').forEach((t,i) => {
-    const tabs = ['dashboard','campana','escenarios','exportar'];
-    t.classList.toggle('active', tabs[i] === name);
-  });
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-  document.getElementById('tab-' + name).classList.add('active');
-  if (name === 'escenarios') renderScenarios();
-  if (name === 'exportar')   updateExportPreview();
-}
-
-// ══════════════════════════════════════════════════════════════
-// UTILS
-// ══════════════════════════════════════════════════════════════
-function fmtMXN(n) {
-  if (n >= 1e6) return '$' + (n/1e6).toFixed(2) + 'M';
-  if (n >= 1e3) return '$' + Math.round(n/1e3) + 'k';
-  return '$' + Math.round(n);
-}
-
-// ══════════════════════════════════════════════════════════════
-// INIT
-// ══════════════════════════════════════════════════════════════
-buildTable();
-initCharts();
-recalc();
-</script>
+<!-- JavaScript modular -->
+<script src="/js/app.js"></script>
 </body>
 </html>
