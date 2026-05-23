@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import prisma from '../src/utils/prisma.js'  // ← usa la misma instancia que el backend
+import prisma from '../src/utils/prisma.js'
 
 const medios = [
   { name: 'TV abierta', defaultCPR: 29000, defaultAM: 97, defaultV: 190 },

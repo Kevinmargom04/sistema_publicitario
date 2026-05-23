@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Budget Allocator — Planeador de Inversión Publicitaria</title>
+  <title>Macro en WEB</title>
   <link rel="stylesheet" href="/css/styles.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 </head>
@@ -31,11 +31,8 @@
     <div class="tab" onclick="showTab('exportar')">📤 Exportar</div>
   </div>
 
-  <!-- ═══════════════════════════════════════════════════════════════ -->
-  <!-- TAB: DASHBOARD -->
-  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- ======================= TAB: DASHBOARD ======================= -->
   <div class="tab-content active" id="tab-dashboard">
-
     <!-- KPIs -->
     <div class="kpis">
       <div class="kpi highlight">
@@ -158,12 +155,9 @@
         <div class="chart-note">Medios en la parte superior izquierda tienen mejor eficiencia (más alcance con menos TRP)</div>
       </div>
     </div>
-
   </div><!-- /tab-dashboard -->
 
-  <!-- ═══════════════════════════════════════════════════════════════ -->
-  <!-- TAB: CAMPAÑA -->
-  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- ======================= TAB: CAMPAÑA ======================= -->
   <div class="tab-content" id="tab-campana">
     <p class="section-label">Información de la Campaña</p>
     <div class="form-row">
@@ -194,7 +188,6 @@
         <textarea id="camp-objetivos" placeholder="Ej. Maximizar alcance en TV y digital..." style="width:320px"></textarea>
       </div>
     </div>
-    <!-- Botón para guardar cambios de campaña -->
     <button class="btn btn-primary" onclick="saveCampaignInfo()" style="margin-top:12px;">Guardar cambios</button>
     <hr class="sep">
     <p class="section-label">Resumen de Simulación Actual</p>
@@ -206,9 +199,7 @@
     </div>
   </div><!-- /tab-campana -->
 
-  <!-- ═══════════════════════════════════════════════════════════════ -->
-  <!-- TAB: ESCENARIOS -->
-  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- ======================= TAB: ESCENARIOS ======================= -->
   <div class="tab-content" id="tab-escenarios">
     <div class="row" style="margin-bottom:14px;justify-content:space-between">
       <p class="section-label" style="margin:0">Escenarios guardados</p>
@@ -227,9 +218,7 @@
     </div>
   </div><!-- /tab-escenarios -->
 
-  <!-- ═══════════════════════════════════════════════════════════════ -->
-  <!-- TAB: EXPORTAR -->
-  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- ======================= TAB: EXPORTAR ======================= -->
   <div class="tab-content" id="tab-exportar">
     <div class="export-section">
       <div class="export-title">📄 Exportar reporte en PDF</div>
@@ -251,13 +240,22 @@
       <p style="font-size:12px;color:#666;margin-bottom:10px">Resumen de los datos actuales que se incluirán en el reporte.</p>
       <div id="preview-data" style="font-size:12px;color:#555;line-height:1.8"></div>
     </div>
-  </div><!-- /tab-exportar -->
+  </div>
+</div>
 
-</div><!-- /app -->
+<!-- ======================= MODAL SELECCIÓN DE CAMPAÑAS ======================= -->
+<div id="campaign-modal" class="modal">
+  <div class="modal-content" style="min-width: 400px;">
+    <h3>Mis campañas</h3>
+    <div id="campaign-list" style="max-height: 300px; overflow-y: auto; margin-bottom: 12px;"></div>
+    <div style="display: flex; gap: 8px;">
+      <input type="text" id="new-campaign-name" placeholder="Nueva campaña" style="flex:1">
+      <button onclick="createCampaign()">Crear</button>
+    </div>
+    <button onclick="hideCampaignSelector()" style="background:#ccc; color:#333; margin-top:8px;">Cerrar</button>
+  </div>
+</div>
 
-
-
-
-<script src="/js/app.js"></script>
+<script src="/js/dashboard.js"></script>
 </body>
 </html>

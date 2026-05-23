@@ -1,4 +1,3 @@
-// src/controllers/campaignController.js
 import prisma from '../utils/prisma.js'
 import { calcularCampana } from '../services/calculationService.js'
 
@@ -146,7 +145,6 @@ export const updateMedium = async (req, res) => {
 }
 
 // ── POST /api/campaigns/:id/calculate ────────────────────────────────────────
-// Corre el motor de cálculo con los datos actuales de la campaña
 export const calculateCampaign = async (req, res) => {
   try {
     const { id } = req.params
@@ -182,7 +180,6 @@ export const calculateCampaign = async (req, res) => {
 }
 
 // ── POST /api/campaigns/:id/scenarios ────────────────────────────────────────
-// Guarda un escenario (snapshot del estado actual)
 export const saveScenario = async (req, res) => {
   try {
     const { id } = req.params
@@ -252,6 +249,65 @@ export const getScenarios = async (req, res) => {
     res.status(500).json({ error: 'Error al obtener escenarios' })
   }
 }
+// ── DELETE /api/campaigns/media/:mediumId ──────────────────────────────────
+export const deleteMedium = async (req, res) => {
+  try {
+    const { mediumId } = req.params
+
+    const medium = await prisma.campaignMedium.findUnique({
+      where: { id: parseInt(mediumId) },
+      include: { campaign: true },
+    })
+    if (!medium || medium.campaign.userId !== req.userId) {
+      return res.status(403).json({ error: 'No autorizado' })
+    }
+
+    await prisma.campaignMedium.delete({ where: { id: parseInt(mediumId) } })
+
+    res.json({ message: 'Medio eliminado' })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ error: 'Error al eliminar medio' })
+  }
+}
+// ── POST /api/campaigns/:campaignId/media ──────────────────────────────────
+export const addMedium = async (req, res) => {
+  try {
+    const { campaignId } = req.params
+    const { name, cpr, am, v } = req.body
+
+    const campaign = await prisma.campaign.findFirst({
+      where: { id: parseInt(campaignId), userId: req.userId },
+    })
+    if (!campaign) return res.status(404).json({ error: 'Campaña no encontrada' })
+
+    // Obtener el último orderIndex para poner el nuevo al final
+    const lastMedium = await prisma.campaignMedium.findFirst({
+      where: { campaignId: parseInt(campaignId) },
+      orderBy: { orderIndex: 'desc' },
+    })
+    const newOrderIndex = lastMedium ? lastMedium.orderIndex + 1 : 0
+
+    const newMedium = await prisma.campaignMedium.create({
+      data: {
+        campaignId: parseInt(campaignId),
+        mediumCatalogId: null,     // no pertenece al catálogo original
+        customName: name,
+        cpr: cpr || 25000,
+        am: am || 50,
+        v: v || 200,
+        investment: 0,
+        orderIndex: newOrderIndex,
+      },
+    })
+
+    // Devolver el medio creado (con su id)
+    res.status(201).json(newMedium)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ error: 'Error al agregar medio' })
+  }
+}
 
 // ── DELETE /api/campaigns/:id/scenarios/:scId ─────────────────────────────────
 export const deleteScenario = async (req, res) => {
@@ -271,7 +327,6 @@ export const deleteScenario = async (req, res) => {
 }
 
 // ── POST /api/campaigns/:id/scenarios/:scId/load ──────────────────────────────
-// Carga un escenario — restaura las inversiones guardadas en el snapshot
 export const loadScenario = async (req, res) => {
   try {
     const { id, scId } = req.params

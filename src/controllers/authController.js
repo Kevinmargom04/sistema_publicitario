@@ -6,32 +6,68 @@ const JWT_SECRET = process.env.JWT_SECRET || 'mi_secreto_super_seguro'
 
 export const register = async (req, res) => {
   try {
-    const { email, password, name } = req.body
+    const { username, name, lastName, age, password, confirmPassword } = req.body
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email y password son requeridos' })
+    if (!username || !name || !password) {
+      return res.status(400).json({ error: 'Usuario, nombre y contraseña son requeridos' })
+    }
+    if (password !== confirmPassword) {
+      return res.status(400).json({ error: 'Las contraseñas no coinciden' })
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } })
+    const existingUser = await prisma.user.findUnique({ where: { username } })
     if (existingUser) {
-      return res.status(400).json({ error: 'El email ya está registrado' })
+      return res.status(400).json({ error: 'El nombre de usuario ya está registrado' })
     }
 
     const hashedPassword = await bcrypt.hash(password, 10)
 
+    // Crear usuario
     const user = await prisma.user.create({
       data: {
-        email,
-        password: hashedPassword,
+        username,
         name,
+        lastName: lastName || null,
+        age: age ? parseInt(age) : null,
+        password: hashedPassword,
       },
     })
+
+    const campaign = await prisma.campaign.create({
+      data: {
+        name: 'Mi primera campaña',
+        userId: user.id,
+      },
+    })
+
+    const catalogs = await prisma.mediumCatalog.findMany()
+    if (catalogs.length === 0) {
+      console.warn('⚠️ Catálogo de medios vacío. Ejecuta el seed.')
+    } else {
+      await prisma.campaignMedium.createMany({
+        data: catalogs.map((cat, idx) => ({
+          campaignId: campaign.id,
+          mediumCatalogId: cat.id,
+          cpr: cat.defaultCPR,
+          am: cat.defaultAM,
+          v: cat.defaultV,
+          investment: 0,
+          orderIndex: idx,
+        })),
+      })
+    }
 
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' })
 
     res.status(201).json({
       token,
-      user: { id: user.id, email: user.email, name: user.name },
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        lastName: user.lastName,
+        age: user.age,
+      },
     })
   } catch (error) {
     console.error(error)
@@ -41,9 +77,13 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body
+    const { username, password } = req.body
 
-    const user = await prisma.user.findUnique({ where: { email } })
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Usuario y contraseña son requeridos' })
+    }
+
+    const user = await prisma.user.findUnique({ where: { username } })
     if (!user) {
       return res.status(401).json({ error: 'Credenciales inválidas' })
     }
@@ -57,7 +97,13 @@ export const login = async (req, res) => {
 
     res.json({
       token,
-      user: { id: user.id, email: user.email, name: user.name },
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        lastName: user.lastName,
+        age: user.age,
+      },
     })
   } catch (error) {
     console.error(error)

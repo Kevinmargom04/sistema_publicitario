@@ -1,5 +1,3 @@
-// public/js/login.js
-
 const API_BASE = '/api'
 
 function showError(elementId, message) {
@@ -86,7 +84,6 @@ document.getElementById('tab-register').addEventListener('click', () => {
 document.getElementById('login-btn').addEventListener('click', handleLogin)
 document.getElementById('register-btn').addEventListener('click', handleRegister)
 
-// Si ya hay token, redirigir directamente al dashboard (opcional)
 if (localStorage.getItem('token')) {
   window.location.href = '/dashboard.html'
 }

@@ -51,8 +51,8 @@ model CampaignMedium {
   id              Int      @id @default(autoincrement())
   campaignId      Int
   campaign        Campaign @relation(fields: [campaignId], references: [id])
-  mediumCatalogId Int
-  mediumCatalog   MediumCatalog @relation(fields: [mediumCatalogId], references: [id])
+  mediumCatalogId Int?                 // ← ahora opcional
+  mediumCatalog   MediumCatalog? @relation(fields: [mediumCatalogId], references: [id])  // ← opcional
   customName      String?
   cpr             Float
   am              Float

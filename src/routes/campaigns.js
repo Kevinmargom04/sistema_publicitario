@@ -1,6 +1,7 @@
-// src/routes/campaigns.js
 import express from 'express'
 import { authMiddleware } from '../middleware/authMiddleware.js'
+import { deleteMedium } from '../controllers/campaignController.js'
+import { addMedium } from '../controllers/campaignController.js'
 import {
   getCampaigns,
   createCampaign,
@@ -17,7 +18,10 @@ import {
 
 const router = express.Router()
 
-router.use(authMiddleware) // todas las rutas requieren auth
+router.use(authMiddleware)
+
+router.delete('/media/:mediumId', deleteMedium)
+router.post('/:campaignId/media', addMedium)
 
 // ── Campañas ──────────────────────────────────────────────────
 router.get('/',     getCampaigns)
