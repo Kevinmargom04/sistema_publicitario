@@ -19,10 +19,7 @@ app.use(cors())
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
-// Servir archivos estáticos (frontend)
-app.use(express.static(path.join(__dirname, '../public')))
-
-// Rutas de la API
+// Rutas de la API (van antes que el estático para priorizarlas)
 app.use('/api/auth', authRoutes)
 app.use('/api/campaigns', campaignRoutes)
 
@@ -31,9 +28,15 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Servidor funcionando' })
 })
 
-// Para cualquier otra ruta, devolver index.html (para SPA, útil luego)
-app.get((req, res) => {
-  res.sendFile(path.join(__dirname, '../public/index.html'))
+// Redirigir raíz a login
+app.get('/', (req, res) => {
+  res.redirect('/login.html')
+})
+
+app.use(express.static(path.join(__dirname, '../public')))
+
+app.use('/api/', (req, res) => {
+  res.status(404).json({ error: 'Endpoint no encontrado' })
 })
 
 app.listen(PORT, () => {
