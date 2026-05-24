@@ -101,7 +101,6 @@ export const deleteCampaign = async (req, res) => {
     })
     if (!campaign) return res.status(404).json({ error: 'Campaña no encontrada' })
 
-    // Borrar en cascada manualmente (Prisma no hace cascade delete por defecto sin onDelete)
     await prisma.scenario.deleteMany({ where: { campaignId: parseInt(id) } })
     await prisma.campaignMedium.deleteMany({ where: { campaignId: parseInt(id) } })
     await prisma.campaign.delete({ where: { id: parseInt(id) } })

@@ -1,64 +1,191 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="/css/login.css">
-  <title>Budget Allocator — Acceso</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SYMORA - Login & Registro</title>
+    <link rel="stylesheet" href="/css/login.css">
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        
+    </style>
 </head>
 <body>
-<div class="login-container">
-  <h1>Budget Allocator</h1>
-  <div class="sub">Planeador de Inversión Publicitaria</div>
 
-  <div class="tabs">
-    <button class="tab-btn active" id="tab-login">Iniciar sesión</button>
-    <button class="tab-btn" id="tab-register">Crear cuenta</button>
-  </div>
+<h2 class="titulo-sistema">SYMORA</h2>
 
-  <div id="login-form">
-    <div class="form-group">
-      <label>Usuario</label>
-      <input type="text" id="login-username" placeholder="Nombre de usuario" autocomplete="username">
+<div class="container" id="container">
+    
+    <!-- Formulario de Registro -->
+    <div class="form-container sign-up-container">
+        <form id="register-form">
+            <h1>Crea tu cuenta</h1>
+            <span>Completa tus datos personales</span>
+            
+            <input type="text" id="reg-name" placeholder="Nombres (Obligatorio)" required />
+            <input type="text" id="reg-lastname" placeholder="Apellidos (Obligatorio)" required />
+            <input type="text" id="reg-username" placeholder="Nombre de Usuario Único" required />
+            <input type="number" id="reg-age" placeholder="Edad" min="1" />
+            
+            <div class="caja-password-animada">
+                <input type="password" id="reg-password" placeholder="Contraseña" required />
+                <button type="button" class="btn-ver-animado" onclick="togglePassword('reg-password', this)">VER</button>
+            </div>
+            
+            <div class="caja-password-animada confirm-password-container">
+                <input type="password" id="reg-confirm-password" placeholder="Confirmar contraseña" required />
+                <button type="button" class="btn-ver-animado" onclick="togglePassword('reg-confirm-password', this)">VER</button>
+            </div>
+            
+            <div id="register-error" class="error-msg"></div>
+            <button type="submit">Registrarse</button>
+        </form>
     </div>
-    <div class="form-group">
-      <label>Contraseña</label>
-      <input type="password" id="login-password" placeholder="Contraseña" autocomplete="current-password">
-    </div>
-    <div id="login-error" class="error-msg"></div>
-    <button id="login-btn">Entrar</button>
-  </div>
 
-  <div id="register-form" class="hidden">
-    <div class="form-group">
-      <label>Usuario</label>
-      <input type="text" id="reg-username" placeholder="Nombre de usuario (único)">
+    <!-- Formulario de Login -->
+    <div class="form-container sign-in-container">
+        <form id="login-form">
+            <h1>Iniciar Sesión</h1>
+            <span>Ingresa al sistema</span>
+            
+            <input type="text" id="login-username" placeholder="Nombre de Usuario" required />
+            
+            <div class="caja-password-animada">
+                <input type="password" id="login-password" placeholder="Contraseña" required />
+                <button type="button" class="btn-ver-animado" onclick="togglePassword('login-password', this)">VER</button>
+            </div>
+            
+            <div id="login-error" class="error-msg"></div>
+            <button type="submit">Ingresar</button>
+        </form>
     </div>
-    <div class="form-group">
-      <label>Nombre</label>
-      <input type="text" id="reg-name" placeholder="Nombre completo">
+
+    <div class="overlay-container">
+        <div class="overlay">
+            <div class="overlay-panel overlay-left">
+                <h1>¡Bienvenido de nuevo!</h1>
+                <p>Si ya tienes una cuenta creada en el sistema, inicia sesión aquí.</p>
+                <button class="ghost" id="signIn">Ir al Login</button>
+            </div>
+            <div class="overlay-panel overlay-right">
+                <h1>¿No tienes una cuenta?</h1>
+                <p>Regístrate ingresando tus datos para empezar a usar SYMORA.</p>
+                <button class="ghost" id="signUp">Regístrate</button>
+            </div>
+        </div>
     </div>
-    <div class="form-group">
-      <label>Apellido (opcional)</label>
-      <input type="text" id="reg-lastname" placeholder="Apellido">
-    </div>
-    <div class="form-group">
-      <label>Edad (opcional)</label>
-      <input type="number" id="reg-age" placeholder="Edad">
-    </div>
-    <div class="form-group">
-      <label>Contraseña</label>
-      <input type="password" id="reg-password" placeholder="Contraseña">
-    </div>
-    <div class="form-group">
-      <label>Confirmar contraseña</label>
-      <input type="password" id="reg-confirm" placeholder="Repite la contraseña">
-    </div>
-    <div id="register-error" class="error-msg"></div>
-    <button id="register-btn">Registrarse</button>
-  </div>
+
 </div>
 
-<script src="/js/login.js"></script>
+<script>
+    // Elementos del DOM
+    const container = document.getElementById('container');
+    const signUpButton = document.getElementById('signUp');
+    const signInButton = document.getElementById('signIn');
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    const loginError = document.getElementById('login-error');
+    const registerError = document.getElementById('register-error');
+
+    // Alternar entre formularios (efecto visual)
+    signUpButton.addEventListener('click', () => {
+        container.classList.add("right-panel-active");
+    });
+    signInButton.addEventListener('click', () => {
+        container.classList.remove("right-panel-active");
+    });
+
+    // Función para mostrar/ocultar contraseña
+    function togglePassword(inputId, button) {
+        const input = document.getElementById(inputId);
+        if (input.type === "password") {
+            input.type = "text";
+            button.textContent = "OCULTAR";
+        } else {
+            input.type = "password";
+            button.textContent = "VER";
+        }
+    }
+
+    // Hacer togglePassword global para que funcione desde el HTML
+    window.togglePassword = togglePassword;
+
+    // Constantes de API
+    const API_BASE = '/api';
+
+    // Función auxiliar para mostrar errores
+    function showError(element, message) {
+        element.textContent = message;
+        setTimeout(() => { element.textContent = ''; }, 4000);
+    }
+
+    // Manejo de LOGIN
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('login-username').value.trim();
+        const password = document.getElementById('login-password').value;
+
+        if (!username || !password) {
+            showError(loginError, 'Usuario y contraseña son requeridos');
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_BASE}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Error al iniciar sesión');
+            localStorage.setItem('token', data.token);
+            window.location.href = '/dashboard.html';
+        } catch (err) {
+            showError(loginError, err.message);
+        }
+    });
+
+    // Manejo de REGISTRO
+    registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('reg-username').value.trim();
+        const name = document.getElementById('reg-name').value.trim();
+        const lastName = document.getElementById('reg-lastname').value.trim();
+        const age = document.getElementById('reg-age').value;
+        const password = document.getElementById('reg-password').value;
+        const confirmPassword = document.getElementById('reg-confirm-password').value;
+
+        if (!username || !name || !password) {
+            showError(registerError, 'Usuario, nombre y contraseña son obligatorios');
+            return;
+        }
+        if (password !== confirmPassword) {
+            showError(registerError, 'Las contraseñas no coinciden');
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_BASE}/auth/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username,
+                    name,
+                    lastName: lastName || undefined,
+                    age: age ? parseInt(age) : undefined,
+                    password,
+                    confirmPassword
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Error al registrarse');
+            localStorage.setItem('token', data.token);
+            window.location.href = '/dashboard.html';
+        } catch (err) {
+            showError(registerError, err.message);
+        }
+    });
+</script>
+
 </body>
 </html>
