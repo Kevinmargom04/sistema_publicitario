@@ -98,6 +98,7 @@ function recalc() {
   updateCampaignTab()
   updateCharts()
   updateExportPreview()
+  renderCurvasNumericas()
 }
 
 // ── TABLA ─────────────────────────────────────────────────────
@@ -113,16 +114,25 @@ function buildTable() {
           <input class="ci-text" id="nm-${i}" value="${esc(m.n)}"
             oninput="medios[${i}].n=this.value; refreshLabels(); scheduleSave(${i})">
         </div>
-       </td>
-       <td><input type="number" class="ci" id="inv-${i}" value="${m.inv}" min="0" step="100000"
-          oninput="medios[${i}].inv=+this.value||0; recalc(); scheduleSave(${i})"></td>
+      </td>
+      <td style="padding:3px 9px">
+        <input type="text" class="ci" id="inv-${i}" value="${formatNumberWithCommas(m.inv)}"
+          oninput="onInvInput(${i}, this.value)"
+          onblur="onInvBlur(${i}, this)">
+      </td>
       <td class="calc" id="soi-${i}">0.0%</td>
-      <td><input type="number" class="ci" id="cpr-${i}" value="${m.cpr}" min="1" step="500"
-          oninput="medios[${i}].cpr=+this.value||1; recalc(); scheduleSave(${i})"></td>
-      <td><input type="number" class="ci" id="am-${i}" value="${m.am}" min="0" max="100" step="0.5"
-          oninput="medios[${i}].am=+this.value||0; recalc(); scheduleSave(${i})"></td>
-      <td><input type="number" class="ci" id="vel-${i}" value="${m.v}" min="1" step="10"
-          oninput="medios[${i}].v=+this.value||1; recalc(); scheduleSave(${i})"></td>
+      <td style="padding:3px 9px">
+        <input type="number" class="ci" id="cpr-${i}" value="${m.cpr}" min="1" step="500"
+          oninput="medios[${i}].cpr=+this.value||1; recalc(); scheduleSave(${i})">
+      </td>
+      <td style="padding:3px 9px">
+        <input type="number" class="ci" id="am-${i}" value="${m.am}" min="0" max="100" step="0.5"
+          oninput="medios[${i}].am=+this.value||0; recalc(); scheduleSave(${i})">
+      </td>
+      <td style="padding:3px 9px">
+        <input type="number" class="ci" id="vel-${i}" value="${m.v}" min="1" step="10"
+          oninput="medios[${i}].v=+this.value||1; recalc(); scheduleSave(${i})">
+      </td>
       <td class="calc" id="trp-${i}">0.0</td>
       <td class="calc" id="alc-${i}">0.0%</td>
       <td class="pos" id="incr-${i}" style="font-size:11px">0.0%</td>
@@ -132,7 +142,8 @@ function buildTable() {
       </td>
       <td style="text-align:center;padding:2px 5px">
         <button class="btn btn-danger" style="padding:2px 6px;font-size:10px" onclick="removeMedio(${i})">×</button>
-      </td>`
+      </td>
+    `
     tbody.appendChild(tr)
   })
 }
@@ -146,6 +157,13 @@ function updateTable() {
     if (el('incr'))   el('incr').textContent   = '+' + m.incr.toFixed(2) + '%'
     if (el('satpct')) el('satpct').textContent = m.sat.toFixed(0) + '%'
     if (el('satbar')) el('satbar').style.width = Math.min(m.sat, 100).toFixed(1) + '%'
+    const invInput = document.getElementById('inv-' + i)
+    if (invInput) {
+      const formatted = formatNumberWithCommas(m.inv)
+      if (invInput.value !== formatted) {
+        invInput.value = formatted
+      }
+    }
   })
   const { tInv, tTRP, tAlc, tIncr } = globalCalc
   document.getElementById('tot-inv').textContent  = fmtMXN(tInv)
@@ -192,6 +210,7 @@ async function addMedio() {
     buildTable()
     rebuildLineChart()
     recalc()
+    rebuildScatterChart()
   } else {
     alert("Error al agregar medio")
   }
@@ -212,6 +231,7 @@ async function removeMedio(index) {
     medios.splice(index, 1)
     buildTable()
     rebuildLineChart()
+    rebuildScatterChart()
     recalc()
   } else {
     alert("Error al eliminar medio")
@@ -279,7 +299,10 @@ async function loadScenario(scId) {
       id: m.id, n: m.customName || m.mediumCatalog.name, inv: m.investment,
       cpr: m.cpr, am: m.am, v: m.v
     }))
-    buildTable(); rebuildLineChart(); recalc()
+    buildTable(); 
+    rebuildLineChart();
+    recalc()
+    rebuildScatterChart()
     showTab('dashboard')
   } else alert("Error al cargar escenario")
 }
@@ -425,7 +448,50 @@ function rebuildLineChart() {
   })
   buildCurveLegend()
 }
+function rebuildScatterChart() {
+  if (cScatter) {
+    cScatter.destroy()
+    cScatter = null
+  }
 
+  const datasets = medios.map((m, i) => ({
+    label: m.n,
+    data: m.trp > 0 ? [{ x: +m.trp.toFixed(1), y: +m.reach.toFixed(1), r: 6 }] : [{ x: 0, y: 0, r: 0 }],
+    backgroundColor: COLORS[i % COLORS.length] + 'cc',
+    borderColor: COLORS[i % COLORS.length],
+  }))
+
+  cScatter = new Chart(document.getElementById('cScatter'), {
+    type: 'bubble',
+    data: { datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (c) => `${c.dataset.label}: TRP=${c.raw.x.toFixed(1)}, Alcance=${c.raw.y.toFixed(1)}%`
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'TRP invertido', font: { size: 10 }, color: LBL_CLR },
+          ticks: TICK,
+          grid: { color: GRID_CLR }
+        },
+        y: {
+          title: { display: true, text: 'Alcance (%)', font: { size: 10 }, color: LBL_CLR },
+          ticks: { ...TICK, callback: v => v + '%' },
+          grid: { color: GRID_CLR },
+          min: 0,
+          max: 100
+        }
+      }
+    }
+  })
+}
 function updateCharts() {
   if (!cBar) return
   const labels = medios.map(m => m.n)
@@ -451,12 +517,7 @@ function updateCharts() {
   }
 
   if (cScatter) {
-    medios.forEach((m, i) => {
-      if (!cScatter.data.datasets[i]) return
-      cScatter.data.datasets[i].label = m.n
-      cScatter.data.datasets[i].data  = m.trp > 0 ? [{ x:+m.trp.toFixed(1), y:+m.reach.toFixed(1), r:6 }] : [{ x:0,y:0,r:0 }]
-    })
-    cScatter.update('none')
+    rebuildScatterChart()
   }
 }
 
@@ -501,10 +562,30 @@ function buildCurveLegend() {
 }
 
 // ── EXPORTR PDF ────────────────────────────────────────────────
-function exportPDF() {
+async function exportPDF() {
   const titulo = document.getElementById('exp-titulo').value || 'Reporte de Planeación de Medios'
   const fecha  = document.getElementById('exp-fecha').value  || new Date().toLocaleDateString('es-MX')
   const { tInv, tTRP, tAlc, freq, tIncr } = globalCalc
+
+  // IDs de los canvas de las gráficas
+  const canvasIds = ['cBar', 'cDonut', 'cIncr', 'cLine', 'cSat', 'cScatter']
+  
+  // Capturar cada gráfica como imagen PNG (dataURL)
+  const images = []
+  for (let id of canvasIds) {
+    const canvas = document.getElementById(id)
+    if (canvas) {
+      try {
+        // Convertir canvas a imagen PNG
+        const imgData = canvas.toDataURL('image/png')
+        images.push({ id, dataUrl: imgData })
+      } catch (err) {
+        console.error(`Error capturando ${id}:`, err)
+      }
+    }
+  }
+
+  // Generar la tabla de medios
   const rows = medios.map(m => `
     <tr>
       <td>${esc(m.n)}</td>
@@ -517,43 +598,69 @@ function exportPDF() {
       <td>${m.reach.toFixed(2)}%</td>
       <td>+${m.incr.toFixed(2)}%</td>
       <td>${m.sat.toFixed(0)}%</td>
-      </tr>`).join('')
+    </tr>`).join('')
+
+  // Construir el HTML con las gráficas incluidas
+  let chartsHtml = ''
+  images.forEach(img => {
+    let title = ''
+    switch (img.id) {
+      case 'cBar': title = 'Alcance por Medio'; break
+      case 'cDonut': title = 'Distribución de Inversión'; break
+      case 'cIncr': title = 'Alcance Incremental'; break
+      case 'cLine': title = 'Curva de Alcance por TRP'; break
+      case 'cSat': title = 'Saturación por Medio'; break
+      case 'cScatter': title = 'Dispersión TRP vs Alcance'; break
+      default: title = img.id
+    }
+    chartsHtml += `
+      <div style="page-break-inside: avoid; margin-bottom: 30px;">
+        <h3 style="font-size: 14px; margin-bottom: 8px;">${title}</h3>
+        <img src="${img.dataUrl}" style="max-width: 100%; border: 1px solid #ddd; border-radius: 4px;" />
+      </div>
+    `
+  })
+
+  // Abrir ventana para impresión
   const win = window.open('', '_blank')
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${titulo}</title>
-    <style>body{font-family:Arial,sans-serif;font-size:12px;color:#111;margin:30px}
-    h1{font-size:18px;margin-bottom:4px}.meta{font-size:11px;color:#888;margin-bottom:20px}
-    .kpis{display:flex;gap:16px;margin-bottom:20px}.kpi{border:1px solid #ddd;padding:10px 14px;flex:1}
-    .kl{font-size:9px;text-transform:uppercase;color:#999;margin-bottom:3px}.kv{font-size:18px;font-weight:bold;font-family:monospace}
-    table{border-collapse:collapse;width:100%;font-size:11px}th{background:#f0f0f0;text-align:right;padding:5px 8px;border:1px solid #ccc;font-size:10px}
-    th:first-child{text-align:left}td{padding:4px 8px;border:1px solid #eee;text-align:right}td:first-child{text-align:left}
-    tfoot td{background:#eee;font-weight:bold;border-top:2px solid #ccc}@media print{body{margin:15px}}</style>
+    <style>
+      body{font-family:Arial,sans-serif;font-size:12px;color:#111;margin:30px}
+      h1{font-size:18px;margin-bottom:4px}.meta{font-size:11px;color:#888;margin-bottom:20px}
+      .kpis{display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+      .kpi{border:1px solid #ddd;padding:10px 14px;flex:1;min-width:120px}
+      .kl{font-size:9px;text-transform:uppercase;color:#999;margin-bottom:3px}
+      .kv{font-size:18px;font-weight:bold;font-family:monospace}
+      table{border-collapse:collapse;width:100%;font-size:11px;margin-bottom:20px}
+      th{background:#f0f0f0;text-align:right;padding:5px 8px;border:1px solid #ccc;font-size:10px}
+      th:first-child{text-align:left}td{padding:4px 8px;border:1px solid #eee;text-align:right}
+      td:first-child{text-align:left}
+      tfoot td{background:#eee;font-weight:bold;border-top:2px solid #ccc}
+      @media print{body{margin:15px}}
+      .page-break { page-break-before: always; }
+    </style>
     </head><body>
-    <h1>${titulo}</h1><div class="meta">Generado el ${fecha} | Budget Allocator</div>
+    <h1>${titulo}</h1>
+    <div class="meta">Generado el ${fecha} | Budget Allocator</div>
     <div class="kpis">
       <div class="kpi"><div class="kl">Inversión Total</div><div class="kv">${fmtMXN(tInv)}</div></div>
       <div class="kpi"><div class="kl">TRP Total</div><div class="kv">${tTRP.toFixed(1)}</div></div>
       <div class="kpi"><div class="kl">Alcance Total</div><div class="kv">${tAlc.toFixed(1)}%</div></div>
       <div class="kpi"><div class="kl">Frecuencia Prom.</div><div class="kv">${freq>0?freq.toFixed(2)+'x':'—'}</div></div>
     </div>
+    <h2>Tabla de Inversión por Medio</h2>
     <table><thead><tr><th>Medio</th><th>Inversión</th><th>SOI %</th><th>CPR</th>
     <th>Alc. Máx</th><th>Velocidad</th><th>TRP</th><th>Alcance %</th><th>Alc. Increm.</th><th>Saturación</th></tr></thead>
     <tbody>${rows}</tbody>
-    <tfoot><tr><td>TOTAL</td><td>${fmtMXN(tInv)}</td><td>100%</td><td>—</td><td>—</td><td>—</td>
+    <tfoot><tr><td>TOTAL</th><td>${fmtMXN(tInv)}</td><td>100%</td><td>—</td><td>—</td><td>—</td>
     <td>${tTRP.toFixed(1)}</td><td>${tAlc.toFixed(1)}%</td><td>${tIncr.toFixed(1)}%</td><td>—</td></tr></tfoot>
-    </table><script>window.onload=()=>window.print()<\/script></body></html>`)
+    </table>
+    <div class="page-break"></div>
+    <h2>Gráficas de la Simulación</h2>
+    ${chartsHtml}
+    <script>window.onload=()=>window.print()<\/script>
+    </body></html>`)
   win.document.close()
-}
-
-function updateExportPreview() {
-  const { tInv, tTRP, tAlc, freq } = globalCalc
-  const activos = medios.filter(m => m.inv > 0)
-  document.getElementById('preview-data').innerHTML = `
-    <strong>Medios con inversión:</strong> ${activos.length ? activos.map(m=>esc(m.n)).join(', ') : 'Ninguno'}<br>
-    <strong>Inversión Total:</strong> ${fmtMXN(tInv)}<br>
-    <strong>TRP Total:</strong> ${tTRP.toFixed(1)}<br>
-    <strong>Alcance Total:</strong> ${tAlc.toFixed(1)}%<br>
-    <strong>Frecuencia:</strong> ${freq > 0 ? freq.toFixed(2)+'x' : '—'}`
-  document.getElementById('exp-fecha').value = new Date().toLocaleDateString('es-MX')
 }
 
 // ── TABS ──────────────────────────────────────────────────────
@@ -564,6 +671,7 @@ function showTab(name) {
   document.getElementById('tab-'+name).classList.add('active')
   if (name === 'escenarios') renderScenarios()
   if (name === 'exportar')   updateExportPreview()
+  if (name === 'curvas') renderCurvasNumericas()
 }
 
 // ── GESTIÓN DE CAMPAÑAS ───────────────────────────────────────
@@ -628,6 +736,7 @@ async function selectCampaign(id) {
   buildTable()
   rebuildLineChart()
   recalc()
+  rebuildScatterChart()
   hideCampaignSelector()
   await loadScenariosList()
 }
@@ -668,5 +777,58 @@ async function init() {
   }
   document.getElementById('logout-btn').style.display = 'inline-block'
   document.getElementById('select-campaign-btn').style.display = 'inline-block'
+}
+function formatNumberWithCommas(n) {
+  if (n === null || n === undefined || isNaN(n)) return '0'
+  return Math.round(n).toLocaleString('en-US')
+}
+
+function parseNumberFromFormatted(str) {
+  if (!str) return 0
+  const cleaned = str.replace(/[^0-9.-]/g, '')
+  const num = parseFloat(cleaned)
+  return isNaN(num) ? 0 : num
+}
+function onInvInput(idx, rawValue) {
+  let numeric = parseNumberFromFormatted(rawValue)
+  if (isNaN(numeric)) numeric = 0
+  medios[idx].inv = numeric
+  recalc()
+  scheduleSave(idx)
+}
+
+function onInvBlur(idx, inputElement) {
+  inputElement.value = formatNumberWithCommas(medios[idx].inv)
+}
+function renderCurvasNumericas() {
+  // Curva total
+  const { tTRP, tAlc } = globalCalc
+  const vAdj = ajustarVelocidad(tTRP, tAlc)
+  const totalBody = document.getElementById('curva-total-body')
+  totalBody.innerHTML = ''
+  TRP_PTS.forEach(trp => {
+    const alc = calcCurvaTotal(trp, tAlc, vAdj).toFixed(2)
+    const row = `<tr><td>${trp}</td><td class="calc">${alc}%</td></tr>`
+    totalBody.innerHTML += row
+  })
+
+  // Curva por medios
+  const headRow = document.getElementById('curva-medios-head')
+  const mediosHead = document.createElement('tr')
+  mediosHead.innerHTML = '<th>TRP</th>' + medios.map(m => `<th>${esc(m.n)}</th>`).join('')
+  headRow.innerHTML = ''
+  headRow.appendChild(mediosHead)
+
+  const mediosBody = document.getElementById('curva-medios-body')
+  mediosBody.innerHTML = ''
+  TRP_PTS.forEach(trp => {
+    let row = `<tr><td>${trp}</td>`
+    medios.forEach(m => {
+      const alc = calcReach(trp, m.am, m.v).toFixed(2)
+      row += `<td class="calc">${alc}%</td>`
+    })
+    row += `</tr>`
+    mediosBody.innerHTML += row
+  })
 }
 init()

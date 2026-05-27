@@ -3,17 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Macro en WEB</title>
+  <title>SYMORA</title>
   <link rel="stylesheet" href="/css/styles.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 <div class="app">
   <!-- TOP BAR con botones de usuario -->
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:6px">
-      <span>📊</span>
-      <h1>Budget Allocator</h1>
+      <span></span>
+      <h1>SYMORA</h1>
       <span class="campaign-name" id="topbar-campaign">— Sin campaña activa</span>
     </div>
     <div class="topbar-right">
@@ -26,6 +27,7 @@
   <!-- TABS -->
   <div class="tabs">
     <div class="tab active" onclick="showTab('dashboard')">📊 Dashboard</div>
+    <div class="tab" onclick="showTab('curvas')">📈 Datos Numéricos</div> 
     <div class="tab" onclick="showTab('campana')">🗂 Campaña</div>
     <div class="tab" onclick="showTab('escenarios')">📁 Escenarios</div>
     <div class="tab" onclick="showTab('exportar')">📤 Exportar</div>
@@ -156,6 +158,28 @@
       </div>
     </div>
   </div><!-- /tab-dashboard -->
+
+  <!-- ======================= TAB: Dats numericos ====== -->
+<div class="tab-content" id="tab-curvas">
+  <p class="section-label">Curva Total de la Campaña</p>
+  <div class="table-wrap" style="max-height: 300px; overflow-y: auto;">
+    <table id="tabla-curva-total" class="min-table" style="width: 100%;">
+      <thead>
+        <tr><th>TRP</th><th>Alcance (%)</th></tr>
+      </thead>
+      <tbody id="curva-total-body"></tbody>
+    </table>
+  </div>
+
+  <p class="section-label" style="margin-top: 24px;">Curva por Medio</p>
+  <div class="table-wrap" style="max-height: 400px; overflow: auto;">
+    <table id="tabla-curva-medios" class="min-table" style="width: 100%;">
+      <thead id="curva-medios-head"></thead>
+      <tbody id="curva-medios-body"></tbody>
+    </table>
+  </div>
+  <div class="chart-note">Valores de alcance (%) para cada nivel de TRP. La curva total utiliza la velocidad ajustada automáticamente.</div>
+</div>
 
   <!-- ======================= TAB: CAMPAÑA ======================= -->
   <div class="tab-content" id="tab-campana">
