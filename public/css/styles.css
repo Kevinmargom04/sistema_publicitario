@@ -52,6 +52,15 @@ tr:hover td { background: #fafcff; }
 tfoot td { background: #efefef; font-weight: bold; border-top: 2px solid #ccc; font-family: monospace; font-size: 12px; }
 tfoot td:first-child { font-family: Arial, sans-serif; }
 .min-table { min-width: 800px}
+td span.calc {
+    display: inline-block;
+    width: 100%;
+    padding: 2px 4px;
+    color: #555;
+    font-family: monospace;
+    font-size: 12px;
+    text-align: right;
+}
 
 /* Inputs in table */
 input.ci {

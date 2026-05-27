@@ -1,5 +1,10 @@
+// ══════════════════════════════════════════════════════════════
+// dashboard.js — Versión completa con modo de edición Inv+CPR / Inv+TRP
+// ══════════════════════════════════════════════════════════════
+
 // ── ESTADO GLOBAL ─────────────────────────────────────────────
 let medios = []
+let modoEdicion = 'inv_cpr'  // 'inv_cpr' o 'inv_trp'
 let scenarios = []
 let activeCampaign = null
 let saveTimer = null
@@ -68,14 +73,19 @@ function ajustarVelocidad(trpTotal, alcMax) {
   return v
 }
 
-// ── MOTOR DE CÁLCULO ──────────────────────────────────────────
+// ── MOTOR DE CÁLCULO (respeta el modo de edición) ─────────────
 let globalCalc = { tInv:0, tTRP:0, tAlc:0, freq:0, tIncr:0, activos:0 }
 
 function recalc() {
   const tInv = medios.reduce((s, m) => s + (m.inv || 0), 0)
 
   medios.forEach(m => {
-    m.trp   = m.cpr > 0 && m.inv > 0 ? m.inv / m.cpr : 0
+    // Asegurar consistencia según modo de edición
+    if (modoEdicion === 'inv_cpr') {
+      m.trp = m.cpr > 0 ? m.inv / m.cpr : 0
+    } else {
+      m.cpr = m.trp > 0 ? m.inv / m.trp : 0
+    }
     m.soi   = tInv > 0 ? (m.inv / tInv) * 100 : 0
     m.reach = calcReach(m.trp, m.am, m.v)
     m.sat   = calcSaturation(m.reach, m.am)
@@ -101,6 +111,25 @@ function recalc() {
   renderCurvasNumericas()
 }
 
+// ── MODO DE EDICIÓN ───────────────────────────────────────────
+function setModoEdicion(modo) {
+  modoEdicion = modo
+  const btnInvCPR = document.getElementById('modoInvCPR')
+  const btnInvTRP = document.getElementById('modoInvTRP')
+  if (btnInvCPR) btnInvCPR.classList.toggle('active', modo === 'inv_cpr')
+  if (btnInvTRP) btnInvTRP.classList.toggle('active', modo === 'inv_trp')
+  // Recalcular los valores para mantener coherencia
+  medios.forEach(m => {
+    if (modo === 'inv_cpr') {
+      m.trp = m.cpr > 0 ? m.inv / m.cpr : 0
+    } else {
+      m.cpr = m.trp > 0 ? m.inv / m.trp : 0
+    }
+  })
+  buildTable()
+  recalc()
+}
+
 // ── TABLA ─────────────────────────────────────────────────────
 function buildTable() {
   const tbody = document.getElementById('tabla-body')
@@ -112,7 +141,7 @@ function buildTable() {
         <div style="display:flex;align-items:center">
           <span class="dot" style="background:${COLORS[i % COLORS.length]}"></span>
           <input class="ci-text" id="nm-${i}" value="${esc(m.n)}"
-            oninput="medios[${i}].n=this.value; refreshLabels(); scheduleSave(${i})">
+            oninput="onNombreChange(${i}, this.value)">
         </div>
       </td>
       <td style="padding:3px 9px">
@@ -122,22 +151,33 @@ function buildTable() {
       </td>
       <td class="calc" id="soi-${i}">0.0%</td>
       <td style="padding:3px 9px">
-        <input type="number" class="ci" id="cpr-${i}" value="${m.cpr}" min="1" step="500"
-          oninput="medios[${i}].cpr=+this.value||1; recalc(); scheduleSave(${i})">
+        ${modoEdicion === 'inv_cpr'
+          ? `<input type="number" class="ci" id="cpr-${i}" value="${m.cpr}" min="1" step="500"
+              oninput="onCprChange(${i}, +this.value||1)">`
+          : `<span class="calc" id="cpr-${i}">${fmtMXN(m.cpr)}</span>`
+        }
       </td>
       <td style="padding:3px 9px">
         <input type="number" class="ci" id="am-${i}" value="${m.am}" min="0" max="100" step="0.5"
-          oninput="medios[${i}].am=+this.value||0; recalc(); scheduleSave(${i})">
+          oninput="onAmChange(${i}, +this.value||0)">
       </td>
       <td style="padding:3px 9px">
         <input type="number" class="ci" id="vel-${i}" value="${m.v}" min="1" step="10"
-          oninput="medios[${i}].v=+this.value||1; recalc(); scheduleSave(${i})">
+          oninput="onVelChange(${i}, +this.value||1)">
       </td>
-      <td class="calc" id="trp-${i}">0.0</td>
+      <td style="padding:3px 9px">
+        ${modoEdicion === 'inv_trp'
+          ? `<input type="number" class="ci" id="trp-${i}" value="${m.trp.toFixed(1)}" min="0" step="1"
+              oninput="onTrpChange(${i}, +this.value||0)">`
+          : `<span class="calc" id="trp-${i}">${m.trp.toFixed(1)}</span>`
+        }
+      </td>
       <td class="calc" id="alc-${i}">0.0%</td>
       <td class="pos" id="incr-${i}" style="font-size:11px">0.0%</td>
       <td style="padding:4px 9px;min-width:90px">
-        <div class="bar-wrap"><div class="bar-fill" id="satbar-${i}" style="width:0%;background:${COLORS[i%COLORS.length]}"></div></div>
+        <div class="bar-wrap">
+          <div class="bar-fill" id="satbar-${i}" style="width:0%;background:${COLORS[i%COLORS.length]}"></div>
+        </div>
         <span class="calc" id="satpct-${i}" style="font-size:11px">0%</span>
       </td>
       <td style="text-align:center;padding:2px 5px">
@@ -152,17 +192,23 @@ function updateTable() {
   medios.forEach((m, i) => {
     const el = id => document.getElementById(id + '-' + i)
     if (el('soi'))    el('soi').textContent    = m.soi.toFixed(1) + '%'
-    if (el('trp'))    el('trp').textContent    = m.trp.toFixed(1)
     if (el('alc'))    el('alc').textContent    = m.reach.toFixed(1) + '%'
     if (el('incr'))   el('incr').textContent   = '+' + m.incr.toFixed(2) + '%'
     if (el('satpct')) el('satpct').textContent = m.sat.toFixed(0) + '%'
     if (el('satbar')) el('satbar').style.width = Math.min(m.sat, 100).toFixed(1) + '%'
+
+    // Actualizar inputs/spans según modo
     const invInput = document.getElementById('inv-' + i)
     if (invInput) {
       const formatted = formatNumberWithCommas(m.inv)
-      if (invInput.value !== formatted) {
-        invInput.value = formatted
-      }
+      if (invInput.value !== formatted) invInput.value = formatted
+    }
+    if (modoEdicion === 'inv_cpr') {
+      const trpSpan = document.getElementById('trp-' + i)
+      if (trpSpan && trpSpan.tagName !== 'INPUT') trpSpan.textContent = m.trp.toFixed(1)
+    } else {
+      const cprSpan = document.getElementById('cpr-' + i)
+      if (cprSpan && cprSpan.tagName !== 'INPUT') cprSpan.textContent = fmtMXN(m.cpr)
     }
   })
   const { tInv, tTRP, tAlc, tIncr } = globalCalc
@@ -172,13 +218,69 @@ function updateTable() {
   document.getElementById('tot-incr').textContent = tIncr.toFixed(1) + '%'
 }
 
+// ── MANEJADORES DE CAMBIOS ────────────────────────────────────
+function onInvInput(idx, rawValue) {
+  let numeric = parseNumberFromFormatted(rawValue)
+  if (isNaN(numeric)) numeric = 0
+  medios[idx].inv = numeric
+  if (modoEdicion === 'inv_cpr') {
+    medios[idx].trp = medios[idx].cpr > 0 ? medios[idx].inv / medios[idx].cpr : 0
+  } else {
+    medios[idx].cpr = medios[idx].trp > 0 ? medios[idx].inv / medios[idx].trp : 0
+  }
+  recalc()
+  scheduleSave(idx)
+}
+
+function onInvBlur(idx, inputElement) {
+  inputElement.value = formatNumberWithCommas(medios[idx].inv)
+}
+
+function onCprChange(idx, value) {
+  if (modoEdicion !== 'inv_cpr') return
+  medios[idx].cpr = value
+  medios[idx].trp = medios[idx].cpr > 0 ? medios[idx].inv / medios[idx].cpr : 0
+  recalc()
+  scheduleSave(idx)
+}
+
+function onTrpChange(idx, value) {
+  if (modoEdicion !== 'inv_trp') return
+  medios[idx].trp = value
+  medios[idx].cpr = medios[idx].trp > 0 ? medios[idx].inv / medios[idx].trp : 0
+  recalc()
+  scheduleSave(idx)
+}
+
+function onAmChange(idx, value) {
+  medios[idx].am = value
+  recalc()
+  scheduleSave(idx)
+}
+
+function onVelChange(idx, value) {
+  medios[idx].v = value
+  recalc()
+  scheduleSave(idx)
+}
+
+function onNombreChange(idx, value) {
+  medios[idx].n = value
+  refreshChartLabels()
+  scheduleSave(idx)
+}
+
 function scheduleSave(idx) {
   if (!activeCampaign || !medios[idx]?.id) return
   clearTimeout(saveTimer)
   saveTimer = setTimeout(async () => {
     const m = medios[idx]
     await API.put(`/campaigns/media/${m.id}`, {
-      investment: m.inv, cpr: m.cpr, am: m.am, v: m.v, customName: m.n
+      investment: m.inv,
+      cpr: m.cpr,
+      am: m.am,
+      v: m.v,
+      customName: m.n
     })
   }, 800)
 }
@@ -198,7 +300,6 @@ async function addMedio() {
     v: 200,
   })
   if (newMedium && newMedium.id) {
-    // Agregar al array local
     medios.push({
       id: newMedium.id,
       n: newMedium.customName,
@@ -206,7 +307,10 @@ async function addMedio() {
       cpr: newMedium.cpr,
       am: newMedium.am,
       v: newMedium.v,
+      trp: 0
     })
+    if (modoEdicion === 'inv_cpr') medios[medios.length-1].trp = 0
+    else medios[medios.length-1].cpr = 0
     buildTable()
     rebuildLineChart()
     recalc()
@@ -296,11 +400,21 @@ async function loadScenario(scId) {
   const data = await API.post(`/campaigns/${activeCampaign.id}/scenarios/${scId}/load`)
   if (data && data.media) {
     medios = data.media.map(m => ({
-      id: m.id, n: m.customName || m.mediumCatalog.name, inv: m.investment,
-      cpr: m.cpr, am: m.am, v: m.v
+      id: m.id,
+      n: m.customName || m.mediumCatalog.name,
+      inv: m.investment,
+      cpr: m.cpr,
+      am: m.am,
+      v: m.v,
+      trp: 0
     }))
-    buildTable(); 
-    rebuildLineChart();
+    // Recalcular valores según modo actual
+    medios.forEach(m => {
+      if (modoEdicion === 'inv_cpr') m.trp = m.cpr > 0 ? m.inv / m.cpr : 0
+      else m.cpr = m.trp > 0 ? m.inv / m.trp : 0
+    })
+    buildTable()
+    rebuildLineChart()
     recalc()
     rebuildScatterChart()
     showTab('dashboard')
@@ -403,17 +517,8 @@ function initCharts() {
       scales: { x:{ticks:{...TICK,maxRotation:40},grid:{display:false}}, y:{ticks:{...TICK,callback:v=>v+'%'},grid:{color:GRID_CLR},min:0,max:100} }
     }
   })
-  cScatter = new Chart(document.getElementById('cScatter'), {
-    type: 'bubble',
-    data: { datasets: medios.map((m,i)=>({ label:m.n, data:[{x:0,y:0,r:0}], backgroundColor:COLORS[i]+'cc', borderColor:COLORS[i] })) },
-    options: { responsive:true, maintainAspectRatio:false,
-      plugins: { legend:{display:false}, tooltip:{callbacks:{label:c=>`${c.dataset.label}: TRP=${c.raw.x.toFixed(1)}, Alc=${c.raw.y.toFixed(1)}%`}} },
-      scales: {
-        x:{title:{display:true,text:'TRP invertido',font:{size:10},color:LBL_CLR},ticks:TICK,grid:{color:GRID_CLR}},
-        y:{title:{display:true,text:'Alcance (%)',font:{size:10},color:LBL_CLR},ticks:{...TICK,callback:v=>v+'%'},grid:{color:GRID_CLR},min:0,max:100}
-      }
-    }
-  })
+  // No creamos cScatter aquí; lo haremos con rebuildScatterChart()
+  rebuildScatterChart()
 }
 
 function rebuildLineChart() {
@@ -448,19 +553,15 @@ function rebuildLineChart() {
   })
   buildCurveLegend()
 }
-function rebuildScatterChart() {
-  if (cScatter) {
-    cScatter.destroy()
-    cScatter = null
-  }
 
+function rebuildScatterChart() {
+  if (cScatter) { cScatter.destroy(); cScatter = null }
   const datasets = medios.map((m, i) => ({
     label: m.n,
     data: m.trp > 0 ? [{ x: +m.trp.toFixed(1), y: +m.reach.toFixed(1), r: 6 }] : [{ x: 0, y: 0, r: 0 }],
     backgroundColor: COLORS[i % COLORS.length] + 'cc',
-    borderColor: COLORS[i % COLORS.length],
+    borderColor: COLORS[i % COLORS.length]
   }))
-
   cScatter = new Chart(document.getElementById('cScatter'), {
     type: 'bubble',
     data: { datasets },
@@ -476,38 +577,41 @@ function rebuildScatterChart() {
         }
       },
       scales: {
-        x: {
-          title: { display: true, text: 'TRP invertido', font: { size: 10 }, color: LBL_CLR },
-          ticks: TICK,
-          grid: { color: GRID_CLR }
-        },
-        y: {
-          title: { display: true, text: 'Alcance (%)', font: { size: 10 }, color: LBL_CLR },
-          ticks: { ...TICK, callback: v => v + '%' },
-          grid: { color: GRID_CLR },
-          min: 0,
-          max: 100
-        }
+        x: { title: { display: true, text: 'TRP invertido', font: { size: 10 }, color: LBL_CLR }, ticks: TICK, grid: { color: GRID_CLR } },
+        y: { title: { display: true, text: 'Alcance (%)', font: { size: 10 }, color: LBL_CLR }, ticks: { ...TICK, callback: v => v + '%' }, grid: { color: GRID_CLR }, min: 0, max: 100 }
       }
     }
   })
 }
+
 function updateCharts() {
   if (!cBar) return
   const labels = medios.map(m => m.n)
 
-  cBar.data.labels = labels; cBar.data.datasets[0].data = medios.map(m => +m.reach.toFixed(2)); cBar.update('none')
-  cDonut.data.labels = labels; cDonut.data.datasets[0].data = medios.map(m => +m.soi.toFixed(2)); cDonut.update('none')
-  cIncr.data.labels = labels; cIncr.data.datasets[0].data = medios.map(m => +m.incr.toFixed(3)); cIncr.update('none')
-  cSat.data.labels = labels; cSat.data.datasets[0].data = medios.map(m => +m.sat.toFixed(1)); cSat.update('none')
+  cBar.data.labels = labels
+  cBar.data.datasets[0].data = medios.map(m => +m.reach.toFixed(2))
+  cBar.update('none')
+
+  cDonut.data.labels = labels
+  cDonut.data.datasets[0].data = medios.map(m => +m.soi.toFixed(2))
+  cDonut.update('none')
+
+  cIncr.data.labels = labels
+  cIncr.data.datasets[0].data = medios.map(m => +m.incr.toFixed(3))
+  cIncr.update('none')
+
+  cSat.data.labels = labels
+  cSat.data.datasets[0].data = medios.map(m => +m.sat.toFixed(1))
+  cSat.update('none')
 
   if (cLine) {
     const { tTRP, tAlc } = globalCalc
     const vAdj = ajustarVelocidad(tTRP, tAlc)
     medios.forEach((m, i) => {
-      if (!cLine.data.datasets[i]) return
-      cLine.data.datasets[i].label = m.n
-      cLine.data.datasets[i].data  = TRP_PTS.map(t => +calcReach(t, m.am, m.v).toFixed(2))
+      if (cLine.data.datasets[i]) {
+        cLine.data.datasets[i].label = m.n
+        cLine.data.datasets[i].data = TRP_PTS.map(t => +calcReach(t, m.am, m.v).toFixed(2))
+      }
     })
     const ti = medios.length
     if (cLine.data.datasets[ti]) {
@@ -516,9 +620,7 @@ function updateCharts() {
     cLine.update('none')
   }
 
-  if (cScatter) {
-    rebuildScatterChart()
-  }
+  rebuildScatterChart() // refrescar scatter cada vez que cambian datos
 }
 
 function refreshChartLabels() {
@@ -532,6 +634,7 @@ function refreshLabels() { refreshChartLabels() }
 
 function buildDonutLegend() {
   const el = document.getElementById('donut-legend')
+  if (!el) return
   el.innerHTML = ''
   medios.forEach((m, i) => {
     const item = document.createElement('div')
@@ -543,6 +646,7 @@ function buildDonutLegend() {
 
 function buildCurveLegend() {
   const el = document.getElementById('curve-legend')
+  if (!el) return
   el.innerHTML = ''
   ;[...medios.map((m,i)=>({n:m.n,c:COLORS[i%COLORS.length]})),{n:'TOTAL',c:'#111'}].forEach((item,i)=>{
     const isTotal = i === medios.length
@@ -561,31 +665,24 @@ function buildCurveLegend() {
   })
 }
 
-// ── EXPORTR PDF ────────────────────────────────────────────────
+// ── EXPORT PDF ────────────────────────────────────────────────
 async function exportPDF() {
   const titulo = document.getElementById('exp-titulo').value || 'Reporte de Planeación de Medios'
   const fecha  = document.getElementById('exp-fecha').value  || new Date().toLocaleDateString('es-MX')
   const { tInv, tTRP, tAlc, freq, tIncr } = globalCalc
 
-  // IDs de los canvas de las gráficas
   const canvasIds = ['cBar', 'cDonut', 'cIncr', 'cLine', 'cSat', 'cScatter']
-  
-  // Capturar cada gráfica como imagen PNG (dataURL)
   const images = []
   for (let id of canvasIds) {
     const canvas = document.getElementById(id)
     if (canvas) {
       try {
-        // Convertir canvas a imagen PNG
         const imgData = canvas.toDataURL('image/png')
         images.push({ id, dataUrl: imgData })
-      } catch (err) {
-        console.error(`Error capturando ${id}:`, err)
-      }
+      } catch (err) { console.error(`Error capturando ${id}:`, err) }
     }
   }
 
-  // Generar la tabla de medios
   const rows = medios.map(m => `
     <tr>
       <td>${esc(m.n)}</td>
@@ -600,7 +697,6 @@ async function exportPDF() {
       <td>${m.sat.toFixed(0)}%</td>
     </tr>`).join('')
 
-  // Construir el HTML con las gráficas incluidas
   let chartsHtml = ''
   images.forEach(img => {
     let title = ''
@@ -621,7 +717,6 @@ async function exportPDF() {
     `
   })
 
-  // Abrir ventana para impresión
   const win = window.open('', '_blank')
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${titulo}</title>
     <style>
@@ -649,7 +744,7 @@ async function exportPDF() {
       <div class="kpi"><div class="kl">Frecuencia Prom.</div><div class="kv">${freq>0?freq.toFixed(2)+'x':'—'}</div></div>
     </div>
     <h2>Tabla de Inversión por Medio</h2>
-    <table><thead><tr><th>Medio</th><th>Inversión</th><th>SOI %</th><th>CPR</th>
+    <thead><tr><th>Medio</th><th>Inversión</th><th>SOI %</th><th>CPR</th>
     <th>Alc. Máx</th><th>Velocidad</th><th>TRP</th><th>Alcance %</th><th>Alc. Increm.</th><th>Saturación</th></tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr><td>TOTAL</th><td>${fmtMXN(tInv)}</td><td>100%</td><td>—</td><td>—</td><td>—</td>
@@ -663,15 +758,27 @@ async function exportPDF() {
   win.document.close()
 }
 
+function updateExportPreview() {
+  const { tInv, tTRP, tAlc, freq } = globalCalc
+  const activos = medios.filter(m => m.inv > 0)
+  document.getElementById('preview-data').innerHTML = `
+    <strong>Medios con inversión:</strong> ${activos.length ? activos.map(m=>esc(m.n)).join(', ') : 'Ninguno'}<br>
+    <strong>Inversión Total:</strong> ${fmtMXN(tInv)}<br>
+    <strong>TRP Total:</strong> ${tTRP.toFixed(1)}<br>
+    <strong>Alcance Total:</strong> ${tAlc.toFixed(1)}%<br>
+    <strong>Frecuencia:</strong> ${freq > 0 ? freq.toFixed(2)+'x' : '—'}`
+  document.getElementById('exp-fecha').value = new Date().toLocaleDateString('es-MX')
+}
+
 // ── TABS ──────────────────────────────────────────────────────
 function showTab(name) {
-  const tabs = ['dashboard','campana','escenarios','exportar']
-  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', tabs[i]===name))
+  const tabs = ['dashboard', 'curvas', 'campana', 'escenarios', 'exportar']
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', tabs[i] === name))
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'))
-  document.getElementById('tab-'+name).classList.add('active')
+  document.getElementById('tab-' + name).classList.add('active')
   if (name === 'escenarios') renderScenarios()
   if (name === 'exportar')   updateExportPreview()
-  if (name === 'curvas') renderCurvasNumericas()
+  if (name === 'curvas')     renderCurvasNumericas()
 }
 
 // ── GESTIÓN DE CAMPAÑAS ───────────────────────────────────────
@@ -694,6 +801,7 @@ function hideCampaignSelector() {
 }
 function renderCampaignList() {
   const el = document.getElementById('campaign-list')
+  if (!el) return
   if (!allCampaigns.length) {
     el.innerHTML = '<div class="empty-state">No hay campañas. Crea una nueva.</div>'
     return
@@ -724,8 +832,13 @@ async function selectCampaign(id) {
     inv: m.investment,
     cpr: m.cpr,
     am: m.am,
-    v: m.v
+    v: m.v,
+    trp: 0
   }))
+  medios.forEach(m => {
+    if (modoEdicion === 'inv_cpr') m.trp = m.cpr > 0 ? m.inv / m.cpr : 0
+    else m.cpr = m.trp > 0 ? m.inv / m.trp : 0
+  })
   document.getElementById('topbar-campaign').textContent = '— ' + data.name
   document.getElementById('camp-nombre').value   = data.name || ''
   document.getElementById('camp-cliente').value  = data.client || ''
@@ -761,14 +874,68 @@ function fmtMXN(n) {
   return '$' + Math.round(n)
 }
 function esc(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+function formatNumberWithCommas(n) {
+  if (n === null || n === undefined || isNaN(n)) return '0'
+  return Math.round(n).toLocaleString('en-US')
+}
+function parseNumberFromFormatted(str) {
+  if (!str) return 0
+  const cleaned = str.replace(/[^0-9.-]/g, '')
+  const num = parseFloat(cleaned)
+  return isNaN(num) ? 0 : num
+}
 
-// ── INIT ──────────────────────────────────────────────────────
+// ── TABLA DE CURVAS NUMÉRICAS ─────────────────────────────────
+function renderCurvasNumericas() {
+  const { tTRP, tAlc } = globalCalc
+  const vAdj = ajustarVelocidad(tTRP, tAlc)
+  const totalBody = document.getElementById('curva-total-body')
+  if (totalBody) {
+    totalBody.innerHTML = ''
+    TRP_PTS.forEach(trp => {
+      const alc = calcCurvaTotal(trp, tAlc, vAdj).toFixed(2)
+      const row = `<tr><td>${trp}</td><td class="calc">${alc}%</td></tr>`
+      totalBody.innerHTML += row
+    })
+  }
+
+  const headRow = document.getElementById('curva-medios-head')
+  if (headRow) {
+    headRow.innerHTML = ''
+    const tr = document.createElement('tr')
+    tr.innerHTML = '<th>TRP</th>' + medios.map(m => `<th>${esc(m.n)}</th>`).join('')
+    headRow.appendChild(tr)
+  }
+
+  const mediosBody = document.getElementById('curva-medios-body')
+  if (mediosBody) {
+    mediosBody.innerHTML = ''
+    TRP_PTS.forEach(trp => {
+      let row = `<td>${trp}</td>`
+      medios.forEach(m => {
+        const alc = calcReach(trp, m.am, m.v).toFixed(2)
+        row += `<td class="calc">${alc}%</td>`
+      })
+      row += `</tr>`
+      mediosBody.innerHTML += row
+    })
+  }
+}
+
+// ── INICIALIZACIÓN ────────────────────────────────────────────
 async function init() {
   initCharts()
   if (!API.token()) {
     window.location.href = '/login.html'
     return
   }
+  // Conectar botones de modo si existen
+  const btnInvCPR = document.getElementById('modoInvCPR')
+  const btnInvTRP = document.getElementById('modoInvTRP')
+  if (btnInvCPR) btnInvCPR.addEventListener('click', () => setModoEdicion('inv_cpr'))
+  if (btnInvTRP) btnInvTRP.addEventListener('click', () => setModoEdicion('inv_trp'))
+  setModoEdicion('inv_cpr')  // establecer modo por defecto
+
   await loadCampaigns()
   if (allCampaigns.length > 0) {
     await selectCampaign(allCampaigns[0].id)
@@ -777,58 +944,5 @@ async function init() {
   }
   document.getElementById('logout-btn').style.display = 'inline-block'
   document.getElementById('select-campaign-btn').style.display = 'inline-block'
-}
-function formatNumberWithCommas(n) {
-  if (n === null || n === undefined || isNaN(n)) return '0'
-  return Math.round(n).toLocaleString('en-US')
-}
-
-function parseNumberFromFormatted(str) {
-  if (!str) return 0
-  const cleaned = str.replace(/[^0-9.-]/g, '')
-  const num = parseFloat(cleaned)
-  return isNaN(num) ? 0 : num
-}
-function onInvInput(idx, rawValue) {
-  let numeric = parseNumberFromFormatted(rawValue)
-  if (isNaN(numeric)) numeric = 0
-  medios[idx].inv = numeric
-  recalc()
-  scheduleSave(idx)
-}
-
-function onInvBlur(idx, inputElement) {
-  inputElement.value = formatNumberWithCommas(medios[idx].inv)
-}
-function renderCurvasNumericas() {
-  // Curva total
-  const { tTRP, tAlc } = globalCalc
-  const vAdj = ajustarVelocidad(tTRP, tAlc)
-  const totalBody = document.getElementById('curva-total-body')
-  totalBody.innerHTML = ''
-  TRP_PTS.forEach(trp => {
-    const alc = calcCurvaTotal(trp, tAlc, vAdj).toFixed(2)
-    const row = `<tr><td>${trp}</td><td class="calc">${alc}%</td></tr>`
-    totalBody.innerHTML += row
-  })
-
-  // Curva por medios
-  const headRow = document.getElementById('curva-medios-head')
-  const mediosHead = document.createElement('tr')
-  mediosHead.innerHTML = '<th>TRP</th>' + medios.map(m => `<th>${esc(m.n)}</th>`).join('')
-  headRow.innerHTML = ''
-  headRow.appendChild(mediosHead)
-
-  const mediosBody = document.getElementById('curva-medios-body')
-  mediosBody.innerHTML = ''
-  TRP_PTS.forEach(trp => {
-    let row = `<tr><td>${trp}</td>`
-    medios.forEach(m => {
-      const alc = calcReach(trp, m.am, m.v).toFixed(2)
-      row += `<td class="calc">${alc}%</td>`
-    })
-    row += `</tr>`
-    mediosBody.innerHTML += row
-  })
 }
 init()
